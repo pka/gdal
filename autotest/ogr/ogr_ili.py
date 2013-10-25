@@ -491,6 +491,56 @@ def ogr_interlis1_11():
     return 'success'
 
 ###############################################################################
+# Ili1 multi-geom test (RFC41)
+
+def ogr_interlis1_12():
+
+    if not gdaltest.have_ili_reader:
+        return 'skip'
+
+    ds = ogr.Open( 'data/ili/multicoord.itf,data/ili/multicoord.ili' )
+
+    layers = ['MulticoordTests__MulticoordTable']
+    if ds.GetLayerCount() != len(layers):
+        gdaltest.post_reason( 'layer count wrong.' )
+        return 'fail'
+
+    for i in range(ds.GetLayerCount()):
+      if not ds.GetLayer(i).GetName() in layers:
+          gdaltest.post_reason( 'Did not get right layers' )
+          return 'fail'
+
+    lyr = ds.GetLayerByName('MulticoordTests__MulticoordTable')
+
+    if lyr.GetFeatureCount() != 1:
+        gdaltest.post_reason( 'feature count wrong.' )
+        return 'fail'
+
+    feat = lyr.GetNextFeature()
+
+    if feat.GetFieldCount() != 6:
+        gdaltest.post_reason( 'field count wrong.' )
+        print feat.GetFieldCount()
+        return 'fail'
+
+    geom_columns = ['coordPoint1', 'coordPoint2']
+
+    if feat.GetGeomFieldCount() != len(geom_columns):
+        gdaltest.post_reason( 'geom field count wrong.' )
+        print feat.GetGeomFieldCount()
+        return 'fail'
+
+    for i in range(feat.GetGeomFieldCount()):
+        defn = lyr.GetLayerDefn().GetGeomFieldDefn(i)
+        if defn.GetName() != str(geom_columns[i]):
+            print("Geom field: " + defn.GetName())
+            return 'fail'
+
+    ds.Destroy()
+
+    return 'success'
+
+###############################################################################
 # Reading Ili2 without model
 
 def ogr_interlis2_1():
@@ -728,6 +778,7 @@ def ogr_interlis_cleanup():
 gdaltest_list = [ 
     ogr_interlis1_1,
     ogr_interlis1_11,
+    ogr_interlis1_12,
     ogr_interlis1_2,
     ogr_interlis1_3,
     ogr_interlis1_4,

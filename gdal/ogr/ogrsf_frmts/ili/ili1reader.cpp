@@ -317,14 +317,10 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
           }
           iom_releaseiterator(fieldit);
 
-          // if multiple gets positive we have more than one geometry column (only points)
-          int multiple = -1;
-
           for (int i=0; i<=maxIdx; i++) {
             IOM_OBJECT obj = fields[i];
             if (obj) {
-             attributes.push_back(obj);
-             if (EQUAL(GetTypeName(model, obj), "iom04.metamodel.CoordType")) multiple++;
+              attributes.push_back(obj);
             }
           }
 
@@ -340,23 +336,15 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
           for(size_t i=0; i<attributes.size(); i++) {
             IOM_OBJECT obj = attributes.at(i);
             const char* typenam = GetTypeName(model, obj);
-            if (EQUAL(typenam, "iom04.metamodel.CoordType") || EQUAL(typenam, "iom04.metamodel.AreaType")) {
+            if (EQUAL(typenam, "iom04.metamodel.AreaType")) {
               feature = OGRFeature::CreateFeature(metaLayer->GetLayerDefn());
               feature->SetFID(j+1);
               feature->SetField("layername", layername);
               feature->SetField("geomIdx", (int)i);
+              feature->SetField("geomlayername", layername);
+              layer = new OGRILI1Layer(layername, poSRSIn, bWriterIn, eReqType, poDSIn);
+              AddLayer(layer);
 
-              if(multiple > 0) {
-                geomlayername = GetPointLayerName(layername, iom_getattrvalue(obj, "name"));
-                feature->SetField("geomlayername", geomlayername);
-                layer = new OGRILI1Layer(geomlayername, poSRSIn, bWriterIn, eReqType, poDSIn);
-                AddLayer(layer);
-
-              } else {
-                feature->SetField("geomlayername", layername);
-                layer = new OGRILI1Layer(layername, poSRSIn, bWriterIn, eReqType, poDSIn);
-                AddLayer(layer);
-              }
               metaLayer->AddFeature(feature);
             }
           }
@@ -372,17 +360,6 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
           for(size_t i=0; i<attributes.size(); i++) {
             IOM_OBJECT obj = attributes.at(i);
             AddField(layer, model, obj);
-          }
-
-          // additional point layer added
-          if(multiple > 0) {
-            for(int i = 1; i <= multiple; i++) {
-               OGRILI1Layer* pointLayer = papoLayers[nLayers-(i+1)];
-               for (int j=0; j < layer->GetLayerDefn()->GetFieldCount(); j++) {
-                 pointLayer->CreateField(layer->GetLayerDefn()->GetFieldDefn(j));
-               }
-            if (pointLayer->GetLayerDefn()->GetGeomType() == wkbUnknown) pointLayer->GetLayerDefn()->SetGeomType(wkbPoint);
-            }
           }
 
           if (papoLayers[nLayers-1]->GetLayerDefn()->GetFieldCount() == 0) {
@@ -688,26 +665,6 @@ int ILI1Reader::ReadTable(const char *layername) {
       }
       else if (EQUAL(firsttok, "ETAB"))
       {
-        if(HasMultiplePointGeom(layername) > 0) {
-          OGRFeature *metaFeature = NULL;
-          metaLayer->ResetReading();
-          while((metaFeature = metaLayer->GetNextFeature()) != NULL ) {
-            int pntCln = 1;
-            if(EQUAL(layername, metaFeature->GetFieldAsString(0)) && !EQUAL(curLayer->GetLayerDefn()->GetName(), metaFeature->GetFieldAsString(2))) {
-              pntCln++;
-              OGRILI1Layer *curLayerTmp = GetLayerByName(metaFeature->GetFieldAsString(2));
-              OGRFeature *tmpFeature = NULL;
-              int geomIdxTmp = metaFeature->GetFieldAsInteger(1);
-              curLayer->ResetReading();
-              while((tmpFeature = curLayer->GetNextFeature()) != NULL ) {
-                OGRPoint *ogrPoint = new OGRPoint(atof(tmpFeature->GetFieldAsString(geomIdxTmp + pntCln)), atof(tmpFeature->GetFieldAsString(geomIdxTmp + pntCln + 1)));
-                tmpFeature->SetGeometryDirectly(ogrPoint);
-                curLayerTmp->AddFeature(tmpFeature);
-              }
-            }
-            delete metaFeature;
-          }
-        }
         CSLDestroy(tokens);
         return TRUE;
       }
