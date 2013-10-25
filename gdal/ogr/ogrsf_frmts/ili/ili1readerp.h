@@ -64,7 +64,7 @@ public:
     int          ReadModel( const char *pszModelFilename );
     int          ReadFeatures();
     int          ReadTable(const char *layername);
-    void         ReadGeom(char **stgeom, OGRwkbGeometryType eType, OGRFeature *feature);
+    void         ReadGeom(char **stgeom, int geomIdx, OGRwkbGeometryType eType, OGRFeature *feature);
     char         **ReadParseLine();
 
     void         AddLayer( OGRILI1Layer * poNewLayer );

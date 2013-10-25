@@ -465,20 +465,26 @@ def ogr_interlis1_11():
     #        Text1 (String) = aa bb
     #        Number (Real) = 40
     #        MULTILINESTRING ((190.26 208.0 0, ...
+    #        GeomPoint_0 (Real) = 148.41
+    #        GeomPoint_1 (Real) = 175.96
 
-    if feat.GetFieldCount() != 3:
+    if feat.GetFieldCount() != 5:
         gdaltest.post_reason( 'field count wrong.' )
         print feat.GetFieldCount()
         return 'fail'
 
-    for i in range(feat.GetGeomFieldCount()):
-        defn = lyr.GetLayerDefn().GetGeomFieldDefn(i)
-        print("Geom field:" + defn.GetName())
+    geom_columns = ['GeomLine', 'GeomPoint']
 
-    if feat.GetGeomFieldCount() != 2:
+    if feat.GetGeomFieldCount() != len(geom_columns):
         gdaltest.post_reason( 'geom field count wrong.' )
         print feat.GetGeomFieldCount()
         return 'fail'
+
+    for i in range(feat.GetGeomFieldCount()):
+        defn = lyr.GetLayerDefn().GetGeomFieldDefn(i)
+        if defn.GetName() != str(geom_columns[i]):
+            print("Geom field: " + defn.GetName())
+            return 'fail'
 
     ds.Destroy()
 
