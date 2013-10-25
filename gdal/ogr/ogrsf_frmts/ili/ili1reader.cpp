@@ -174,6 +174,11 @@ OGRILI1Layer* ILI1Reader::AddGeomTable(const char* datalayername, const char* ge
   }
   OGRFieldDefn fieldDef2("ILI_Geometry", OFTString); //in write mode only?
   geomlayer->GetLayerDefn()->AddFieldDefn(&fieldDef2);
+
+  OGRGeomFieldDefn oGFld(geomname, eType);
+  oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
+  geomlayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
+
   return geomlayer;
 }
 
@@ -189,10 +194,16 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     IOM_OBJECT controlPointDomain = GetAttrObj(model, GetTypeObj(model, obj), "controlPointDomain");
     if (controlPointDomain) {
       AddCoord(layer, model, obj, GetTypeObj(model, controlPointDomain));
+      OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPoint);
+      oGFld.SetSpatialRef(layer->GetSpatialRef());
+      layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
     }
     OGRILI1Layer* areaLineLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbMultiLineString);
 #ifdef POLYGONIZE_AREAS
     OGRILI1Layer* areaLayer = new OGRILI1Layer(CPLSPrintf("%s__Areas",layer->GetLayerDefn()->GetName()), NULL, 0, wkbPolygon, NULL);
+    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPolygon);
+    oGFld.SetSpatialRef(areaLayer->GetSpatialRef());
+    areaLayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
     AddLayer(areaLayer);
     areaLayer->SetAreaLayers(layer, areaLineLayer);
 #endif
