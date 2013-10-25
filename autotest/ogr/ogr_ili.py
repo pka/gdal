@@ -464,11 +464,9 @@ def ogr_interlis1_11():
     #        _TID (String) = 0
     #        Text1 (String) = aa bb
     #        Number (Real) = 40
-    #        GeomPoint_0 (Real) = 148.41
-    #        GeomPoint_1 (Real) = 175.96
     #        MULTILINESTRING ((190.26 208.0 0, ...
 
-    if feat.GetFieldCount() != 5:
+    if feat.GetFieldCount() != 3:
         gdaltest.post_reason( 'field count wrong.' )
         print feat.GetFieldCount()
         return 'fail'

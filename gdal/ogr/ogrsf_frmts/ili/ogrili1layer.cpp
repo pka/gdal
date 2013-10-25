@@ -53,7 +53,8 @@ OGRILI1Layer::OGRILI1Layer( const char * pszName,
 
     poFeatureDefn = new OGRFeatureDefn( pszName );
     poFeatureDefn->Reference();
-    poFeatureDefn->SetGeomType( eReqType );
+    // Delete default geometry field
+    poFeatureDefn->DeleteGeomFieldDefn(0);
 
     nFeatures = 0;
     papoFeatures = NULL;
@@ -400,14 +401,6 @@ OGRErr OGRILI1Layer::CreateField( OGRFieldDefn *poField, int bApproxOK ) {
     poFeatureDefn->AddFieldDefn( poField );
 
     return OGRERR_NONE;
-}
-
-/************************************************************************/
-/*                           GetSpatialRef()                            */
-/************************************************************************/
-
-OGRSpatialReference *OGRILI1Layer::GetSpatialRef() {
-    return poSRS;
 }
 
 

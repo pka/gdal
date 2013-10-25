@@ -180,7 +180,7 @@ OGRILI1Layer* ILI1Reader::AddGeomTable(const char* datalayername, const char* ge
 void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj) {
   const char* typenam = "Reference";
   if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.LocalAttribute")) typenam = GetTypeName(model, obj);
-  //CPLDebug( "OGR_ILI", "Field %s: %s", iom_getattrvalue(obj, "name"), typenam);
+  CPLDebug( "OGR_ILI", "Field %s: %s", iom_getattrvalue(obj, "name"), typenam);
   if (EQUAL(typenam, "iom04.metamodel.SurfaceType")) {
     OGRILI1Layer* polyLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbPolygon);
     layer->SetSurfacePolyLayer(polyLayer);
@@ -189,7 +189,6 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     IOM_OBJECT controlPointDomain = GetAttrObj(model, GetTypeObj(model, obj), "controlPointDomain");
     if (controlPointDomain) {
       AddCoord(layer, model, obj, GetTypeObj(model, controlPointDomain));
-      layer->GetLayerDefn()->SetGeomType(wkbPoint);
     }
     OGRILI1Layer* areaLineLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbMultiLineString);
 #ifdef POLYGONIZE_AREAS
@@ -198,10 +197,13 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     areaLayer->SetAreaLayers(layer, areaLineLayer);
 #endif
   } else if (EQUAL(typenam, "iom04.metamodel.PolylineType") ) {
-    layer->GetLayerDefn()->SetGeomType(wkbMultiLineString);
+    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbMultiLineString);
+    oGFld.SetSpatialRef(layer->GetSpatialRef());
+    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
   } else if (EQUAL(typenam, "iom04.metamodel.CoordType")) {
-    AddCoord(layer, model, obj, GetTypeObj(model, obj));
-    if (layer->GetLayerDefn()->GetGeomType() == wkbUnknown) layer->GetLayerDefn()->SetGeomType(wkbPoint);
+    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPoint);
+    oGFld.SetSpatialRef(layer->GetSpatialRef());
+    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
   } else if (EQUAL(typenam, "iom04.metamodel.NumericType") ) {
      OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTReal);
      layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
@@ -832,10 +834,6 @@ void ILI1Reader::AddLayer( OGRILI1Layer * poNewLayer )
 
     papoLayers[nLayers-1] = poNewLayer;
 }
-
-/************************************************************************/
-/*                              AddAreaLayer()                              */
-/************************************************************************/
 
 /************************************************************************/
 /*                              GetLayer()                              */
