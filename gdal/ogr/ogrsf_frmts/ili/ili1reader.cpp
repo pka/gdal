@@ -154,6 +154,10 @@ void ILI1Reader::AddCoord(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT mode
     layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
     //CPLDebug( "AddCoord   OGR_ILI", "Field %s: OFTReal", fieldDef.GetNameRef());
   }
+  OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
+  OGRGeomFieldDefn oGFld(iom_getattrvalue(modelele, "name"), geomType);
+  oGFld.SetSpatialRef(layer->GetSpatialRef());
+  layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
 }
 
 OGRILI1Layer* ILI1Reader::AddGeomTable(const char* datalayername, const char* geomname, OGRwkbGeometryType eType) {
@@ -194,9 +198,6 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     IOM_OBJECT controlPointDomain = GetAttrObj(model, GetTypeObj(model, obj), "controlPointDomain");
     if (controlPointDomain) {
       AddCoord(layer, model, obj, GetTypeObj(model, controlPointDomain));
-      OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPoint);
-      oGFld.SetSpatialRef(layer->GetSpatialRef());
-      layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
     }
     OGRILI1Layer* areaLineLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbMultiLineString);
 #ifdef POLYGONIZE_AREAS
@@ -213,9 +214,6 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
   } else if (EQUAL(typenam, "iom04.metamodel.CoordType")) {
     AddCoord(layer, model, obj, GetTypeObj(model, obj));
-    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPoint);
-    oGFld.SetSpatialRef(layer->GetSpatialRef());
-    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
   } else if (EQUAL(typenam, "iom04.metamodel.NumericType") ) {
      OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTReal);
      layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
@@ -633,10 +631,16 @@ int ILI1Reader::ReadTable(const char *layername) {
                 } else {
                   geomIdx = -1;
                 }
-                if (geomIdx >= 0 && featureDef->GetGeomFieldDefn(geomIdx)->GetType() == wkbPoint) {
-                  //add Point geometry
-                  OGRPoint *ogrPoint = new OGRPoint(atof(tokens[fIndex-1]), atof(tokens[fIndex]));
-                  feature->SetGeomFieldDirectly(geomIdx, ogrPoint);
+                if (geomIdx >= 0) {
+                  if (featureDef->GetGeomFieldDefn(geomIdx)->GetType() == wkbPoint) {
+                    //add Point geometry
+                    OGRPoint *ogrPoint = new OGRPoint(atof(tokens[fIndex-1]), atof(tokens[fIndex]));
+                    feature->SetGeomFieldDirectly(geomIdx, ogrPoint);
+                  } else if (featureDef->GetGeomFieldDefn(geomIdx)->GetType() == wkbPoint25D && fieldno > 1 && featureDef->GetFieldDefn(fieldno-2)->GetType() == OFTReal) {
+                    //add 3D Point geometry
+                    OGRPoint *ogrPoint = new OGRPoint(atof(tokens[fIndex-2]), atof(tokens[fIndex-1]), atof(tokens[fIndex]));
+                    feature->SetGeomFieldDirectly(geomIdx, ogrPoint);
+                  }
                 }
               }
             }
