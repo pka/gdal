@@ -191,8 +191,11 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
   if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.LocalAttribute")) typenam = GetTypeName(model, obj);
   CPLDebug( "OGR_ILI", "Field %s: %s", iom_getattrvalue(obj, "name"), typenam);
   if (EQUAL(typenam, "iom04.metamodel.SurfaceType")) {
+    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPolygon);
+    oGFld.SetSpatialRef(layer->GetSpatialRef());
+    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
     OGRILI1Layer* polyLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbPolygon);
-    layer->SetSurfacePolyLayer(polyLayer);
+    layer->SetSurfacePolyLayer(polyLayer, layer->GetLayerDefn()->GetGeomFieldCount()-1); //TODO: support multiple surface geoms in layer -> use metadata struct
     //TODO: add line attributes to geometry
   } else if (EQUAL(typenam, "iom04.metamodel.AreaType")) {
     IOM_OBJECT controlPointDomain = GetAttrObj(model, GetTypeObj(model, obj), "controlPointDomain");
@@ -206,7 +209,7 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     oGFld.SetSpatialRef(areaLayer->GetSpatialRef());
     areaLayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
     AddLayer(areaLayer);
-    areaLayer->SetAreaLayers(layer, areaLineLayer);
+    areaLayer->SetAreaLayers(layer, areaLineLayer); //TODO: support multiple area geoms in layer -> use metadata struct
 #endif
   } else if (EQUAL(typenam, "iom04.metamodel.PolylineType") ) {
     OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbMultiLineString);
@@ -626,10 +629,9 @@ int ILI1Reader::ReadTable(const char *layername) {
             CPLDebug( "OGR_ILI", "Field count doesn't match. %d declared, %d found", featureDef->GetFieldCount(), CSLCount(tokens)-1);
             warned = TRUE;
           }
-          if (featureDef->GetGeomType() == wkbPolygon) //FIXME: if layer has area geom
-            feature->SetFID(atol(feature->GetFieldAsString(1)));
-          else if (feature->GetFieldCount() > 0)
-            feature->SetFID(atol(feature->GetFieldAsString(0)));
+          if (feature->GetFieldCount() > 0) {
+            feature->SetFID(atol(feature->GetFieldAsString(0))); //TODO: use IDENT field from model instead of TID
+          }
           curLayer->AddFeature(feature);
           geomIdx = -1; //Reset
         }
