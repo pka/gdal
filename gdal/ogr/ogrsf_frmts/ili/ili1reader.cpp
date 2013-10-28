@@ -102,32 +102,6 @@ int ILI1Reader::OpenFile( const char *pszFilename ) {
     return TRUE;
 }
 
-int ILI1Reader::HasMultiplePointGeom(const char* layername) {
-    if (metaLayer != NULL) {
-        OGRFeature *metaFeature = NULL;
-        metaLayer->ResetReading();
-        int i = -1;
-        while((metaFeature = metaLayer->GetNextFeature()) != NULL ) {
-            if(EQUAL(layername, metaFeature->GetFieldAsString(0))) {
-              i++;
-            }
-            delete metaFeature;
-        }
-        return i;
-    } else {
-        return -1;
-    }
-}
-
-char* ILI1Reader::GetPointLayerName(const char* layername, char* newlayername) {
-    static char geomlayername[512];
-    geomlayername[0] = '\0';
-    strcat(geomlayername, layername);
-    strcat(geomlayername, "__");
-    strcat(geomlayername, newlayername);
-    return geomlayername;
-}
-
 const char* ILI1Reader::GetLayerNameString(const char* topicname, const char* tablename) {
     static char layername[512];
     layername[0] = '\0';
@@ -333,7 +307,7 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
           }
 
           OGRFeature *feature = NULL;
-          char* geomlayername = '\0';
+          //char* geomlayername = '\0';
           OGRILI1Layer* layer = NULL;
 
           for(size_t i=0; i<attributes.size(); i++) {
@@ -444,11 +418,7 @@ int ILI1Reader::ReadFeatures() {
         const char *layername = GetLayerNameString(topic, CSLGetField(tokens, 1));
         curLayer = GetLayerByName(layername);
 
-        int multiple = HasMultiplePointGeom(layername);
-
-        // create only a new layer if there is no curLayer AND
-        // if there are more than one point geometry columns
-        if (curLayer == NULL && multiple < 1) { //create one
+        if (curLayer == NULL) { //create one
           CPLDebug( "OGR_ILI", "No model found, using default field names." );
           OGRSpatialReference *poSRSIn = NULL;
           int bWriterIn = 0;
@@ -522,22 +492,6 @@ int ILI1Reader::ReadTable(const char *layername) {
     int warned = FALSE;
     int fIndex;
     int geomIdx = -1;
-
-    // curLayer is NULL if we have more than one
-    // point geometry column
-    if(curLayer == NULL) {
-      OGRFeature *metaFeature = NULL;
-      metaLayer->ResetReading();
-      while((metaFeature = metaLayer->GetNextFeature()) != NULL ) {
-        if(EQUAL(layername, metaFeature->GetFieldAsString(0))) {
-          const char *geomlayername = metaFeature->GetFieldAsString(2);
-          curLayer = GetLayerByName(geomlayername);
-          delete metaFeature;
-          break;
-        }
-        delete metaFeature;
-      }
-    }
 
     OGRFeatureDefn *featureDef = curLayer->GetLayerDefn();
     OGRFeature *feature = NULL;

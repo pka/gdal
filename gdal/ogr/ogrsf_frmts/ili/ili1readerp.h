@@ -73,8 +73,6 @@ public:
     OGRILI1Layer *GetLayerByName( const char* );
     int          GetLayerCount();
 
-    int          HasMultiplePointGeom(const char* layername);
-    char*        GetPointLayerName(const char* layername, char* newlayername);
     const char*  GetLayerNameString(const char* topicname, const char* tablename);
     const char*  GetLayerName(IOM_BASKET model, IOM_OBJECT table);
     void         AddCoord(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT modelele, IOM_OBJECT typeobj);
