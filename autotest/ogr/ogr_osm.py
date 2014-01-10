@@ -85,7 +85,9 @@ def ogr_osm_1(filename = 'data/test.pbf'):
             return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_id') != '3':
+    if feat.GetFieldAsString('osm_id') != '3' or \
+       feat.GetFieldAsString('name') != 'Some interesting point' or \
+       feat.GetFieldAsString('other_tags') != '"foo"=>"bar","bar"=>"baz"' :
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
@@ -108,7 +110,9 @@ def ogr_osm_1(filename = 'data/test.pbf'):
         return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_id') != '1':
+    if feat.GetFieldAsString('osm_id') != '1' or \
+       feat.GetFieldAsString('highway') != 'motorway' or \
+       feat.GetFieldAsString('other_tags') != '"foo"=>"bar"' :
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
@@ -147,12 +151,9 @@ def ogr_osm_1(filename = 'data/test.pbf'):
             return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_id') != '1':
-        gdaltest.post_reason('fail')
-        feat.DumpReadable()
-        return 'fail'
-
-    if feat.GetFieldAsString('natural') != 'forest':
+    if feat.GetFieldAsString('osm_id') != '1' or \
+       feat.GetFieldAsString('type') != 'multipolygon' or \
+       feat.GetFieldAsString('natural') != 'forest':
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
@@ -169,23 +170,16 @@ def ogr_osm_1(filename = 'data/test.pbf'):
             return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_id') != '5':
-        gdaltest.post_reason('fail')
-        feat.DumpReadable()
-        return 'fail'
-
-    if feat.GetFieldAsString('natural') != 'wood':
+    if feat.GetFieldAsString('osm_id') != '5' or \
+       feat.GetFieldAsString('type') != 'multipolygon' or \
+       feat.GetFieldAsString('natural') != 'wood':
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_way_id') != '8':
-        gdaltest.post_reason('fail')
-        feat.DumpReadable()
-        return 'fail'
-
-    if feat.GetFieldAsString('name') != 'standalone_polygon':
+    if feat.GetFieldAsString('osm_way_id') != '8' or \
+       feat.GetFieldAsString('name') != 'standalone_polygon':
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
@@ -208,7 +202,8 @@ def ogr_osm_1(filename = 'data/test.pbf'):
             return 'fail'
 
     feat = lyr.GetNextFeature()
-    if feat.GetFieldAsString('osm_id') != '3':
+    if feat.GetFieldAsString('osm_id') != '3' or \
+       feat.GetFieldAsString('type') != 'route':
         gdaltest.post_reason('fail')
         feat.DumpReadable()
         return 'fail'
@@ -242,7 +237,8 @@ def ogr_osm_1(filename = 'data/test.pbf'):
             return 'fail'
 
         feat = lyr.GetNextFeature()
-        if feat.GetFieldAsString('osm_id') != '4':
+        if feat.GetFieldAsString('osm_id') != '4' or \
+           feat.GetFieldAsString('type') != 'other_type':
             gdaltest.post_reason('fail')
             feat.DumpReadable()
             return 'fail'
@@ -637,6 +633,56 @@ def ogr_osm_10():
 
     return 'success'
 
+###############################################################################
+# Test all_tags
+
+def ogr_osm_11():
+
+    if ogrtest.osm_drv is None:
+        return 'skip'
+
+    gdal.SetConfigOption('OSM_CONFIG_FILE', 'data/osmconf_alltags.ini')
+    ds = ogr.Open('data/test.pbf')
+    gdal.SetConfigOption('OSM_CONFIG_FILE', None)
+    lyr = ds.GetLayerByName('points')
+    feat = lyr.GetNextFeature()
+    if feat.GetFieldAsString('osm_id') != '3' or \
+       feat.GetFieldAsString('name') != 'Some interesting point' or \
+       feat.GetFieldAsString('all_tags') != '"name"=>"Some interesting point","foo"=>"bar","bar"=>"baz"' :
+        gdaltest.post_reason('fail')
+        feat.DumpReadable()
+        return 'fail'
+
+    return 'success'
+
+
+###############################################################################
+# Test that attribute filter set on a line layer is well taken into
+# account
+
+def ogr_osm_12():
+
+    if ogrtest.osm_drv is None:
+        return 'skip'
+
+    ds = ogr.Open('data/test.pbf')
+    for i in range(2):
+        lay = ds.GetLayerByIndex(i)
+        lay.SetAttributeFilter("highway IS NOT NULL")
+        # lay.GetNextFeature()
+        lay.ResetReading()
+        feat = lay.GetNextFeature()
+        count = 0
+        while feat is not None:
+            count = count + 1
+            feat = lay.GetNextFeature()
+        if i == 1 and count != 1:
+            print(count)
+            return 'fail'
+    ds = None
+
+    return 'success'
+
 gdaltest_list = [
     ogr_osm_1,
     ogr_osm_2,
@@ -650,6 +696,8 @@ gdaltest_list = [
     ogr_osm_8,
     ogr_osm_9,
     ogr_osm_10,
+    ogr_osm_11,
+    ogr_osm_12,
     ]
 
 if __name__ == '__main__':

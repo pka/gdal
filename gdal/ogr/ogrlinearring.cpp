@@ -118,11 +118,13 @@ OGRErr OGRLinearRing::importFromWkb( unsigned char *pabyData, int nSize )
 /************************************************************************/
 
 OGRErr OGRLinearRing::exportToWkb( OGRwkbByteOrder eByteOrder, 
-                                   unsigned char * pabyData ) const
+                                   unsigned char * pabyData,
+                                   OGRwkbVariant eWkbVariant ) const
 
 {
     (void) eByteOrder;
     (void) pabyData;
+    (void) eWkbVariant;
 
     return OGRERR_UNSUPPORTED_OPERATION;
 }
@@ -351,6 +353,14 @@ int OGRLinearRing::isClockwise() const
                paoPoints[i].x > paoPoints[v].x ) )
         {
             v = i;
+            bUseFallback = FALSE;
+        }
+        else if ( paoPoints[i].y == paoPoints[v].y &&
+                  paoPoints[i].x == paoPoints[v].x )
+        {
+            /* Two vertex with same coordinates are the lowest rightmost */
+            /* vertex! We cannot use that point as the pivot (#5342) */
+            bUseFallback = TRUE;
         }
     }
 
@@ -579,12 +589,15 @@ OGRBoolean OGRLinearRing::isPointOnRingBoundary(const OGRPoint* poPoint, int bTe
     const double dfTestY = poPoint->getY();
 
     // Fast test if point is inside extent of the ring
-    OGREnvelope extent;
-    getEnvelope(&extent);
-    if ( !( dfTestX >= extent.MinX && dfTestX <= extent.MaxX
-         && dfTestY >= extent.MinY && dfTestY <= extent.MaxY ) )
+    if( bTestEnvelope )
     {
-        return 0;
+        OGREnvelope extent;
+        getEnvelope(&extent);
+        if ( !( dfTestX >= extent.MinX && dfTestX <= extent.MaxX
+            && dfTestY >= extent.MinY && dfTestY <= extent.MaxY ) )
+        {
+            return 0;
+        }
     }
 
     for ( int iPoint = 1; iPoint < iNumPoints; iPoint++ ) 

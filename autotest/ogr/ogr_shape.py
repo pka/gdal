@@ -1206,7 +1206,6 @@ def ogr_shape_28():
     field_defn.SetWidth(99)
     lyr.CreateField(field_defn)
     field_defn.Destroy()
-    ds.Destroy()
     ds = None
 
     os.remove('tmp/hugedbf.shp')
@@ -1246,21 +1245,50 @@ def ogr_shape_28():
     # Update with a new value
     feat.SetField(0, 'updated_value')
     lyr.SetFeature(feat)
-    feat.Destroy()
+    feat = None
+
+    # Test creating a feature over 2 GB file limit -> should work
+    gdal.ErrorReset()
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    ret = lyr.CreateFeature(feat)
+    gdal.PopErrorHandler()
+    if ret != 0:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    if gdal.GetLastErrorMsg().find('2GB file size limit reached') < 0:
+        gdaltest.post_reason('did not find expected warning')
+        return 'fail'
 
     ds.Destroy()
     ds = None
 
     # Re-open and check the new value
-    ds = ogr.Open('tmp/hugedbf.dbf')
+    gdal.SetConfigOption('SHAPE_2GB_LIMIT', 'TRUE')
+    ds = ogr.Open('tmp/hugedbf.dbf', 1)
+    gdal.SetConfigOption('SHAPE_2GB_LIMIT', None)
     lyr = ds.GetLayer(0)
     feat = lyr.GetFeature(23900000);
     if feat.GetFieldAsString(0) != 'updated_value':
         print(feat.GetFieldAsString(0))
         return 'fail'
-    feat.Destroy()
+    feat = None
 
-    ds.Destroy()
+    # Test creating a feature over 2 GB file limit -> should fail
+    gdal.ErrorReset()
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    ret = lyr.CreateFeature(feat)
+    gdal.PopErrorHandler()
+    if ret == 0:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    if gdal.GetLastErrorMsg().find('2GB file size limit reached') < 0:
+        gdaltest.post_reason('did not find expected warning')
+        return 'fail'
+
     ds = None
 
     return 'success'
@@ -2040,6 +2068,42 @@ def ogr_shape_48():
     ds = None
     
     ogr.GetDriverByName('ESRI Shapefile').DeleteDataSource('/vsimem/ogr_shape_48.shp')
+    
+    # Test with Polygon
+    ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource('/vsimem/ogr_shape_48.shp')
+    lyr = ds.CreateLayer('ogr_shape_48')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POLYGON((0 0,0 -1,-1 -1,-1 0,0 0))'))
+    lyr.CreateFeature(feat)
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POLYGON((0 0,0 1,1 1,1 0,0 0))'))
+    lyr.SetFeature(feat)
+    ds.ExecuteSQL('RECOMPUTE EXTENT ON ogr_shape_48')
+    extent = lyr.GetExtent()
+    if extent != (0,1,0,1):
+        gdaltest.post_reason('did not get expected extent (4)')
+        print(lyr.GetExtent())
+        return 'fail'
+    ds = None
+    ogr.GetDriverByName('ESRI Shapefile').DeleteDataSource('/vsimem/ogr_shape_48.shp')
+    
+    # Test with PolygonZ
+    ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource('/vsimem/ogr_shape_48.shp')
+    lyr = ds.CreateLayer('ogr_shape_48')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POLYGON((0 0 -2,0 -1 -2,-1 -1 -2,-1 0 -2,0 0 -2))'))
+    lyr.CreateFeature(feat)
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POLYGON((0 0 2,0 1 2,1 1 2,1 0 2,0 0 2))'))
+    lyr.SetFeature(feat)
+    ds.ExecuteSQL('RECOMPUTE EXTENT ON ogr_shape_48')
+    # FIXME: when we have a GetExtent3D
+    extent = lyr.GetExtent()
+    if extent != (0,1,0,1):
+        gdaltest.post_reason('did not get expected extent (4)')
+        print(lyr.GetExtent())
+        return 'fail'
+    ds = None
+    ogr.GetDriverByName('ESRI Shapefile').DeleteDataSource('/vsimem/ogr_shape_48.shp')
+
 
     return 'success'
     
@@ -2072,6 +2136,14 @@ def ogr_shape_49():
 # Test that we can read encoded file names
 
 def ogr_shape_50():
+
+    try:
+        drv = gdal.GetDriverByName( 'HTTP' )
+    except:
+        drv = None
+
+    if drv is None:
+        return 'skip'
 
     ds = ogr.Open( '/vsizip/vsicurl/http://jira.codehaus.org/secure/attachment/37994/test1.zip')
     if ds is None:
@@ -3440,6 +3512,157 @@ def ogr_shape_71():
     return 'success'
 
 ###############################################################################
+# Test shapefile size limit
+
+def ogr_shape_72():
+
+    # Determine if the filesystem supports sparse files (we don't want to create a real 3 GB
+    # file !
+    if (gdaltest.filesystem_supports_sparse_files('tmp') == False):
+        return 'skip'
+
+    import struct
+    ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource('tmp/ogr_shape_72.shp')
+    lyr = ds.CreateLayer('2gb', geom_type = ogr.wkbPoint)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (1 2)'))
+    lyr.CreateFeature(feat)
+    ds = None
+
+    f = open('tmp/ogr_shape_72.shp', 'rb+')
+    f.seek(24)
+    f.write(struct.pack('B' * 4, 0x7f,0xff,0xff,0xfe))
+    f.close()
+
+    # Test creating a feature over 4 GB file limit -> should fail
+    ds = ogr.Open('tmp/ogr_shape_72.shp', update = 1)
+    lyr = ds.GetLayer(0)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (3 4)'))
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    ret = lyr.CreateFeature(feat)
+    gdal.PopErrorHandler()
+    if ret == 0:
+        gdaltest.post_reason('fail')
+        return 'fail'
+    ds = None
+
+    f = open('tmp/ogr_shape_72.shp', 'rb+')
+    f.seek(24)
+    f.write(struct.pack('B' * 4, 0x3f,0xff,0xff,0xfe))
+    f.close()
+
+    # Test creating a feature over 2 GB file limit -> should fail
+    gdal.SetConfigOption('SHAPE_2GB_LIMIT', 'TRUE')
+    ds = ogr.Open('tmp/ogr_shape_72.shp', update = 1)
+    gdal.SetConfigOption('SHAPE_2GB_LIMIT', None)
+    lyr = ds.GetLayer(0)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (5 6)'))
+    gdal.ErrorReset()
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    ret = lyr.CreateFeature(feat)
+    gdal.PopErrorHandler()
+    if ret == 0:
+        gdaltest.post_reason('fail')
+        return 'fail'
+    ds = None
+
+    # Test creating a feature over 2 GB file limit -> should succeed with warning
+    ds = ogr.Open('tmp/ogr_shape_72.shp', update = 1)
+    lyr = ds.GetLayer(0)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (7 8)'))
+    gdal.ErrorReset()
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    ret = lyr.CreateFeature(feat)
+    gdal.PopErrorHandler()
+    if ret != 0:
+        gdaltest.post_reason('fail')
+        return 'fail'
+    if gdal.GetLastErrorMsg().find('2GB file size limit reached') < 0:
+        gdaltest.post_reason('did not find expected warning')
+        return 'fail'
+    ds = None
+
+    ds = ogr.Open('tmp/ogr_shape_72.shp')
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetFeature(1)
+    if feat.GetGeometryRef().ExportToWkt() != 'POINT (7 8)':
+        gdaltest.post_reason('fail')
+        return 'fail'
+    ds = None
+
+    return 'success'
+
+###############################################################################
+# Test that isClockwise() works correctly on a degenerated ring that passes
+# twice by the same point (#5342)
+
+def ogr_shape_73():
+
+    ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource('/vsimem/ogr_shape_73.shp')
+    lyr = ds.CreateLayer('ogr_shape_73', geom_type = ogr.wkbPolygon)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    # (5 1) is the first(and last) point, and the pivot point selected by the
+    # algorithm (lowest rightmost vertex), but is is also reused later in the
+    # coordinate list
+    # But the second ring is counter-clock-wise
+    geom = ogr.CreateGeometryFromWkt('POLYGON ((0 0,0 10,10 10,10 0,0 0),(5 1,4 3,4 2,5 1,6 2,6 3,5 1))')
+    feat.SetGeometry(geom)
+    lyr.CreateFeature(feat)
+    feat = None
+    ds = None
+    
+    ds = ogr.Open('/vsimem/ogr_shape_73.shp')
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetNextFeature()
+    got_geom = feat.GetGeometryRef()
+    if geom.ExportToWkt() != got_geom.ExportToWkt():
+        feat.DumpReadable()
+        return 'fail'
+    ds = None
+
+    return 'success'
+
+###############################################################################
+# Test organizePolygons() in OGR_ORGANIZE_POLYGONS=DEFAULT mode when
+# two outer rings are touching, by the first vertex of one.
+
+def ogr_shape_74():
+
+    ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource('/vsimem/ogr_shape_74.shp')
+    lyr = ds.CreateLayer('ogr_shape_74', geom_type = ogr.wkbPolygon)
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    geom = ogr.CreateGeometryFromWkt('MULTIPOLYGON (((0 10,10 10,10 0,0 0,0 1,9 1,9 9,0 9,0 10)),((9 5,5 4,0 5,5 6, 9 5)))')
+    feat.SetGeometry(geom)
+    lyr.CreateFeature(feat)
+    feat = None
+    ds = None
+
+    ds = ogr.Open('/vsimem/ogr_shape_74.shp')
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetNextFeature()
+    got_geom = feat.GetGeometryRef()
+    if geom.ExportToWkt() != got_geom.ExportToWkt():
+        gdaltest.post_reason('fail')
+        feat.DumpReadable()
+        return 'fail'
+
+    lyr.ResetReading()
+    gdal.SetConfigOption('OGR_ORGANIZE_POLYGONS', 'DEFAULT')
+    feat = lyr.GetNextFeature()
+    gdal.SetConfigOption('OGR_ORGANIZE_POLYGONS', None)
+    got_geom = feat.GetGeometryRef()
+    if geom.ExportToWkt() != got_geom.ExportToWkt():
+        gdaltest.post_reason('fail')
+        feat.DumpReadable()
+        return 'fail'
+    ds = None
+
+    return 'success'
+    
+###############################################################################
 # 
 
 def ogr_shape_cleanup():
@@ -3467,7 +3690,9 @@ def ogr_shape_cleanup():
     shape_drv.DeleteDataSource( '/vsimem/ogr_shape_58' )
     shape_drv.DeleteDataSource( '/vsimem/ogr_shape_61' )
     shape_drv.DeleteDataSource( '/vsimem/ogr_shape_62' )
-    
+    shape_drv.DeleteDataSource( '/vsimem/ogr_shape_73.shp' )
+    shape_drv.DeleteDataSource( '/vsimem/ogr_shape_74.shp' )
+
     return 'success'
 
 gdaltest_list = [ 
@@ -3544,6 +3769,9 @@ gdaltest_list = [
     ogr_shape_69,
     ogr_shape_70,
     ogr_shape_71,
+    ogr_shape_72,
+    ogr_shape_73,
+    ogr_shape_74,
     ogr_shape_cleanup ]
 
 if __name__ == '__main__':

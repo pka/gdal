@@ -118,10 +118,13 @@ OGRErr OGRGeometryFactory::createFromWkb(unsigned char *pabyData,
 /*      geometry type is between 0 and 255 so we only have to fetch     */
 /*      one byte.                                                       */
 /* -------------------------------------------------------------------- */
-    if( eByteOrder == wkbNDR )
-        eGeometryType = (OGRwkbGeometryType) pabyData[1];
-    else
-        eGeometryType = (OGRwkbGeometryType) pabyData[4];
+
+    OGRBoolean bIs3D;
+    OGRErr err = OGRReadWKBGeometryType( pabyData, &eGeometryType, &bIs3D );
+
+    if( err != OGRERR_NONE )
+        return err;
+
 
 /* -------------------------------------------------------------------- */
 /*      Instantiate a geometry of the appropriate type, and             */
@@ -1158,7 +1161,8 @@ OGRGeometry* OGRGeometryFactory::organizePolygons( OGRGeometry **papoPolygons,
 
     /* If we are in ONLY_CCW mode and that we have found that there is only one outer ring, */
     /* then it is pretty easy : we can assume that all other rings are inside */
-    if (method == METHOD_ONLY_CCW && nCountCWPolygon == 1 && bUseFastVersion)
+    if (method == METHOD_ONLY_CCW &&
+        nCountCWPolygon == 1 && bUseFastVersion && !bNonPolygon )
     {
         geom = asPolyEx[indexOfCWPolygon].poPolygon;
         for(i=0; i<nPolygonCount; i++)
@@ -1277,9 +1281,11 @@ OGRGeometry* OGRGeometryFactory::organizePolygons( OGRGeometry **papoPolygons,
             {
                 if (bUseFastVersion)
                 {
-                    /* Note that isPointInRing only test strict inclusion in the ring */
-                    if (asPolyEx[j].poExteriorRing->isPointInRing(&asPolyEx[i].poAPoint, FALSE))
+                    if( method == METHOD_ONLY_CCW && j == 0 )
                     {
+                        /* We are testing if a CCW ring is in the biggest CW ring */
+                        /* It *must* be inside as this is the last candidate, otherwise */
+                        /* the winding order rules is broken */
                         b_i_inside_j = TRUE;
                     }
                     else if (asPolyEx[j].poExteriorRing->isPointOnRingBoundary(&asPolyEx[i].poAPoint, FALSE))
@@ -1290,22 +1296,56 @@ OGRGeometry* OGRGeometryFactory::organizePolygons( OGRGeometry **papoPolygons,
                         {
                             OGRPoint point;
                             asPolyEx[i].poExteriorRing->getPoint(k, &point);
-                            if (asPolyEx[j].poExteriorRing->isPointInRing(&point, FALSE))
+                            if (asPolyEx[j].poExteriorRing->isPointOnRingBoundary(&point, FALSE))
+                            {
+                                /* If it is on the boundary of j, iterate again */ 
+                            }
+                            else if (asPolyEx[j].poExteriorRing->isPointInRing(&point, FALSE))
                             {
                                 /* If then point is strictly included in j, then i is considered inside j */
                                 b_i_inside_j = TRUE;
                                 break;
                             }
-                            else if (asPolyEx[j].poExteriorRing->isPointOnRingBoundary(&point, FALSE))
-                            {
-                                /* If it is on the boundary of j, iterate again */ 
-                            }
-                            else
+                            else 
                             {
                                 /* If it is outside, then i cannot be inside j */
                                 break;
                             }
                         }
+                        if( !b_i_inside_j && k == nPoints && nPoints > 2 )
+                        {
+                            /* all points of i are on the boundary of j ... */
+                            /* take a point in the middle of a segment of i and */
+                            /* test it against j */
+                            for(k=0;k<nPoints-1;k++)
+                            {
+                                OGRPoint point1, point2, pointMiddle;
+                                asPolyEx[i].poExteriorRing->getPoint(k, &point1);
+                                asPolyEx[i].poExteriorRing->getPoint(k+1, &point2);
+                                pointMiddle.setX((point1.getX() + point2.getX()) / 2);
+                                pointMiddle.setY((point1.getY() + point2.getY()) / 2);
+                                if (asPolyEx[j].poExteriorRing->isPointOnRingBoundary(&pointMiddle, FALSE))
+                                {
+                                    /* If it is on the boundary of j, iterate again */ 
+                                }
+                                else if (asPolyEx[j].poExteriorRing->isPointInRing(&pointMiddle, FALSE))
+                                {
+                                    /* If then point is strictly included in j, then i is considered inside j */
+                                    b_i_inside_j = TRUE;
+                                    break;
+                                }
+                                else 
+                                {
+                                    /* If it is outside, then i cannot be inside j */
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    /* Note that isPointInRing only test strict inclusion in the ring */
+                    else if (asPolyEx[j].poExteriorRing->isPointInRing(&asPolyEx[i].poAPoint, FALSE))
+                    {
+                        b_i_inside_j = TRUE;
                     }
                 }
                 else if (asPolyEx[j].poPolygon->Contains(asPolyEx[i].poPolygon))

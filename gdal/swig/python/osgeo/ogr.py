@@ -1812,6 +1812,10 @@ class Layer(_object):
         """
         return _ogr.Layer_RollbackTransaction(self, *args)
 
+    def FindFieldIndex(self, *args):
+        """FindFieldIndex(self, char pszFieldName, int bExactMatch) -> int"""
+        return _ogr.Layer_FindFieldIndex(self, *args)
+
     def GetSpatialRef(self, *args):
         """
         GetSpatialRef(self) -> SpatialReference
@@ -2699,6 +2703,13 @@ class Feature(_object):
         papszValues:  the values to assign. 
         """
         return _ogr.Feature_SetFieldStringList(self, *args)
+
+    def SetFieldBinaryFromHexString(self, *args):
+        """
+        SetFieldBinaryFromHexString(self, int id, char pszValue)
+        SetFieldBinaryFromHexString(self, char name, char pszValue)
+        """
+        return _ogr.Feature_SetFieldBinaryFromHexString(self, *args)
 
     def SetFrom(self, *args, **kwargs):
         """
