@@ -37,24 +37,12 @@ CPL_CVSID("$Id$");
 /*                           OGRILI2Layer()                              */
 /************************************************************************/
 
-OGRILI2Layer::OGRILI2Layer( const char * pszName,
-                          OGRSpatialReference *poSRSIn, int bWriterIn,
-                          OGRwkbGeometryType eReqType,
+OGRILI2Layer::OGRILI2Layer( OGRFeatureDefn* poFeatureDefnIn,
                           OGRILI2DataSource *poDSIn )
 
 {
-    if( poSRSIn == NULL )
-        poSRS = NULL;
-    else
-        poSRS = poSRSIn->Clone();
-
-    poDS = poDSIn;
-
-    poFeatureDefn = new OGRFeatureDefn( pszName );
+    poFeatureDefn = poFeatureDefnIn;
     poFeatureDefn->Reference();
-    poFeatureDefn->SetGeomType( eReqType );
-
-    bWriter = bWriterIn;
 
     listFeatureIt = listFeature.begin();
 }
@@ -68,9 +56,6 @@ OGRILI2Layer::~OGRILI2Layer()
 {
     if( poFeatureDefn )
         poFeatureDefn->Release();
-
-    if( poSRS != NULL )
-        poSRS->Release();
 
     listFeatureIt = listFeature.begin();
     while(listFeatureIt != listFeature.end())

@@ -32,17 +32,16 @@
 
 #include "cpl_vsi.h"
 #include "cpl_error.h"
+#include "ogr_feature.h"
+#include <list>
 
 
 class ImdReader
 {
-private:
-    FILE                *fpImd;
-
 public:
                          ImdReader();
                         ~ImdReader();
-    int                  ReadModel(const char *pszFilename);
+    std::list<OGRFeatureDefn*> ReadModel(const char *pszFilename);
 };
 
 #endif /* _IMDREADER_H_INCLUDED */

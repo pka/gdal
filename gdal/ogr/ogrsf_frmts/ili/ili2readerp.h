@@ -38,6 +38,7 @@
 
 #include "ili2reader.h"
 #include "ogr_ili2.h"
+#include "imdreader.h"
 
 #include <string>
 #include <set>
@@ -73,7 +74,7 @@ class ILI2Reader;
 class ILI2Handler : public DefaultHandler 
 {
     ILI2Reader  *m_poReader;
-    
+
     int level;
     
     DOMDocument *dom_doc;
@@ -124,9 +125,11 @@ private:
     void     CleanupParser();
     
     char    *m_pszFilename;
+
     
     std::list<std::string> m_missAttrs;
 
+    ImdReader *m_imdReader;
     ILI2Handler *m_poILI2Handler;
     SAX2XMLReader *m_poSAXReader;
     int      m_bReadStarted;

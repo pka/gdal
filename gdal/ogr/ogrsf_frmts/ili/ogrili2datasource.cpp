@@ -100,6 +100,7 @@ int OGRILI2DataSource::Open( const char * pszNewName, int bTestOpen )
 
     pszName = CPLStrdup( filenames[0] );
 
+    //? modelFilenames = CPLGetConfigOption("ILI_MODEL", NULL);
     if( CSLCount(filenames) > 1 )
         modelFilenames = &filenames[1];
 
@@ -272,7 +273,9 @@ OGRILI2DataSource::CreateLayer( const char * pszLayerName,
                                char ** papszOptions )
 
 {
-    OGRILI2Layer *poLayer = new OGRILI2Layer(pszLayerName, poSRS, TRUE, eType, this);
+    OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(pszLayerName);
+    poFeatureDefn->SetGeomType( eType );
+    OGRILI2Layer *poLayer = new OGRILI2Layer(poFeatureDefn, this);
 
     nLayers ++;
     papoLayers = (OGRILI2Layer**)CPLRealloc(papoLayers, sizeof(OGRILI2Layer*) * nLayers);

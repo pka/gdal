@@ -46,20 +46,14 @@ class OGRILI2DataSource;
 class OGRILI2Layer : public OGRLayer
 {
 private:
-    OGRSpatialReference *poSRS;
     OGRFeatureDefn     *poFeatureDefn;
     std::list<OGRFeature *>    listFeature;
     std::list<OGRFeature *>::const_iterator listFeatureIt;
 
-    int                 bWriter;
-
     OGRILI2DataSource   *poDS;
 
   public:
-                        OGRILI2Layer( const char * pszName, 
-                                     OGRSpatialReference *poSRS, 
-                                     int bWriter,
-                                     OGRwkbGeometryType eType,
+                        OGRILI2Layer( OGRFeatureDefn* poFeatureDefn,
                                      OGRILI2DataSource *poDS );
 
                        ~OGRILI2Layer();

@@ -401,85 +401,12 @@ void ILI2Reader::AddField(OGRLayer* layer, IOM_BASKET model, IOM_OBJECT obj) {
 }
 
 int ILI2Reader::ReadModel(char **modelFilenames) {
-
-  IOM_BASKET model;
-  IOM_ITERATOR modelelei;
-  IOM_OBJECT modelele;
-
-  iom_init();
-
-  // set error listener to a iom provided one, that just
-  // dumps all errors to stderr
-  iom_seterrlistener(iom_stderrlistener);
-
-  // compile ili models
-  model=iom_compileIli(CSLCount(modelFilenames), modelFilenames);
-  if(!model){
-    CPLError( CE_Failure, CPLE_FileIO, "iom_compileIli failed." );
-    iom_end();
-    return FALSE;
+  std::list<OGRFeatureDefn*> poTableList = m_imdReader->ReadModel(modelFilenames[0]);
+  for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
+  {
+    OGRLayer* layer = new OGRILI2Layer(*it, NULL);
+    m_listLayer.push_back(layer);
   }
-
-  // read tables
-  modelelei=iom_iteratorobject(model);
-  modelele=iom_nextobject(modelelei);
-  while(modelele){
-    const char *tag=iom_getobjecttag(modelele);
-    if (tag && EQUAL(tag,"iom04.metamodel.Table")) {
-      const char* topic = iom_getattrvalue(GetAttrObj(model, modelele, "container"), "name");
-      if (!EQUAL(topic, "INTERLIS")) {
-        const char* layername = GetLayerName(model, modelele);
-        OGRLayer* layer = new OGRILI2Layer(layername, NULL, 0, wkbUnknown, NULL);
-        m_listLayer.push_back(layer);
-        CPLDebug( "OGR_ILI", "Reading table model '%s'", layername );
-
-        // read fields
-        IOM_OBJECT fields[255];
-        IOM_OBJECT roledefs[255];
-        memset(fields, 0, 255);
-        memset(roledefs, 0, 255);
-        int maxIdx = -1;
-        IOM_ITERATOR fieldit=iom_iteratorobject(model);
-        for (IOM_OBJECT fieldele=iom_nextobject(fieldit); fieldele; fieldele=iom_nextobject(fieldit)){
-          const char *etag=iom_getobjecttag(fieldele);
-          if (etag && (EQUAL(etag,"iom04.metamodel.ViewableAttributesAndRoles"))) {
-            IOM_OBJECT table = GetAttrObj(model, fieldele, "viewable");
-            if (table == modelele) {
-              IOM_OBJECT obj = GetAttrObj(model, fieldele, "attributesAndRoles");
-              int ili1AttrIdx = GetAttrObjPos(fieldele, "attributesAndRoles")-1;
-              if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.RoleDef")) {
-                //??ili1AttrIdx = atoi(iom_getattrvalue(GetAttrObj(model, obj, "oppend"), "ili1AttrIdx"));
-                roledefs[ili1AttrIdx] = obj;
-              } else {
-                fields[ili1AttrIdx] = obj;
-              }
-              if (ili1AttrIdx > maxIdx) maxIdx = ili1AttrIdx;
-              //CPLDebug( "OGR_ILI", "Field %s Pos: %d", iom_getattrvalue(obj, "name"), ili1AttrIdx);
-            }
-          }
-          iom_releaseobject(fieldele);
-        }
-        iom_releaseiterator(fieldit);
-
-        for (int i=0; i<=maxIdx; i++) {
-          IOM_OBJECT obj = fields[i];
-          IOM_OBJECT roleobj = roledefs[i];
-          if (roleobj) AddField(layer, model, roleobj);
-          if (obj) AddField(layer, model, obj);
-        }
-      }
-    }
-    iom_releaseobject(modelele);
-
-    modelele=iom_nextobject(modelelei);
-  }
-
-  iom_releaseiterator(modelelei);
-
-  iom_releasebasket(model);
-
-  iom_end();
-
   return 0;
 }
 
@@ -573,11 +500,13 @@ ILI2Reader::ILI2Reader() {
     m_bReadStarted = FALSE;
 
     m_pszFilename = NULL;
+    m_imdReader = new ImdReader();
 
     SetupParser();
 }
 
 ILI2Reader::~ILI2Reader() {
+    delete m_imdReader;
     CPLFree( m_pszFilename );
 
     CleanupParser();
@@ -728,6 +657,7 @@ int ILI2Reader::AddFeature(DOMElement *elem) {
   bool newLayer = true;
   OGRLayer *curLayer = 0;
   char *pszName = XMLString::transcode(elem->getTagName());
+  //CPLDebug( "OGR_ILI", "Reading layer: %s", pszName );
 
   // test if this layer exist
   for (list<OGRLayer *>::reverse_iterator layerIt = m_listLayer.rbegin();
@@ -742,14 +672,11 @@ int ILI2Reader::AddFeature(DOMElement *elem) {
   }
 
   // add a layer
-  if (newLayer) { // FIXME in Layer: SRS Writer Type datasource
+  if (newLayer) {
     CPLDebug( "OGR_ILI", "Adding layer: %s", pszName );
-    // new layer data
-    OGRSpatialReference *poSRSIn = NULL; // FIXME fix values for initial layer
-    int bWriterIn = 0;
-    OGRwkbGeometryType eReqType = wkbUnknown;
-    OGRILI2DataSource *poDSIn = NULL;
-    curLayer = new OGRILI2Layer(pszName, poSRSIn, bWriterIn, eReqType, poDSIn);
+    OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(pszName);
+    poFeatureDefn->SetGeomType( wkbUnknown );
+    curLayer = new OGRILI2Layer(poFeatureDefn, NULL);
     m_listLayer.push_back(curLayer);
   }
 

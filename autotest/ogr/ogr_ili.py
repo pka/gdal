@@ -604,7 +604,7 @@ def ogr_interlis2_2():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/RoadsExdm2ien.xml,data/ili/RoadsExdm2ben.ili,data/ili/RoadsExdm2ien.ili' )
+    ds = ogr.Open( 'data/ili/RoadsExdm2ien.xml,data/ili/RoadsExdm2ien.imd' )
     if ds is None:
         return 'fail'
 
@@ -790,9 +790,6 @@ def ogr_interlis_cleanup():
 
 gdaltest_list = [ 
     ogr_interlis1_1,
-    ogr_interlis1_11,
-    ogr_interlis1_12,
-    ogr_interlis1_13,
     ogr_interlis1_2,
     ogr_interlis1_3,
     ogr_interlis1_4,
@@ -801,6 +798,9 @@ gdaltest_list = [
     ogr_interlis1_7,
     ogr_interlis1_9,
     #ogr_interlis1_10,
+    ogr_interlis1_11,
+    ogr_interlis1_12,
+    ogr_interlis1_13,
     ogr_interlis2_1,
     ogr_interlis2_2,
     ogr_interlis_arc1,
