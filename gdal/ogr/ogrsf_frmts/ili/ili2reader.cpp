@@ -374,32 +374,6 @@ OGRGeometry *ILI2Reader::getGeometry(DOMElement *elem, int type) {
   return gm;
 }
 
-const char* ILI2Reader::GetLayerName(IOM_BASKET model, IOM_OBJECT table) {
-    static char layername[512];
-    IOM_OBJECT topic = GetAttrObj(model, table, "container");
-    layername[0] = '\0';
-    strcat(layername, iom_getattrvalue(GetAttrObj(model, topic, "container"), "name"));
-    strcat(layername, ".");
-    strcat(layername, iom_getattrvalue(topic, "name"));
-    strcat(layername, ".");
-    strcat(layername, iom_getattrvalue(table, "name"));
-    return layername;
-}
-
-void ILI2Reader::AddField(OGRLayer* layer, IOM_BASKET model, IOM_OBJECT obj) {
-  const char* typenam = "Reference";
-  if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.LocalAttribute")) typenam = GetTypeName(model, obj);
-  if (EQUAL(typenam, "iom04.metamodel.SurfaceType")) {
-  } else if (EQUAL(typenam, "iom04.metamodel.AreaType")) {
-  } else if (EQUAL(typenam, "iom04.metamodel.PolylineType") ) {
-  } else if (EQUAL(typenam, "iom04.metamodel.CoordType")) {
-  } else {
-    OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTString);
-    layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-    CPLDebug( "OGR_ILI", "Field %s: %s", fieldDef.GetNameRef(), typenam);
-  }
-}
-
 int ILI2Reader::ReadModel(char **modelFilenames) {
   std::list<OGRFeatureDefn*> poTableList = m_imdReader->ReadModel(modelFilenames[0]);
   for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
@@ -482,6 +456,11 @@ void ILI2Reader::SetFieldValues(OGRFeature *feature, DOMElement* elem) {
         CPLFree(fName);
       }
     } else {
+      char *fName = fieldName(childElem); //FIXME: wrong names 'Geometry_SURFACE', 'Geometry_POLYLINE', 'NamPos_COORD', 'Position_COORD'
+      //CPLDebug( "OGR_ILI","Setting geometry value of Attribute '%s'", fName);
+      //TODO (multigeom):
+      // int fIndex = feature->GetGeomFieldIndex(fName);
+      // feature->SetGeomFieldDirectly(fIndex, getGeometry(childElem, type));
       feature->SetGeometryDirectly(getGeometry(childElem, type));
     }
   }

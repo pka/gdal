@@ -88,9 +88,58 @@ public:
         {
             if (*it == NULL) continue;
             const char* psName = CPLGetXMLValue( *it, "Name", NULL );
-            OGRFieldDefn fieldDef(psName, OFTString); //TODO: determine field type
-            poTableDefn->AddFieldDefn(&fieldDef); //TODO: add geometry fields
-            CPLDebug( "OGR_ILI", "Adding field %s to Class %s", fieldDef.GetNameRef(), poTableDefn->GetName());
+            const char* psTypeRef = CPLGetXMLValue( *it, "Type.REF", NULL );
+            OGRFieldType fieldType = OFTString;
+            OGRwkbGeometryType geomType = wkbUnknown;
+            if (psTypeRef == NULL) //Assoc Role
+                fieldType = OFTString; //FIXME: numeric?
+            else
+            {
+                CPLXMLNode* psElementNode = oTidLookup[psTypeRef];
+                const char* typeName = psElementNode->pszValue;
+                if (EQUAL(typeName, "IlisMeta07.ModelData.TextType"))
+                { //Kind Text,MText
+                    fieldType = OFTString;
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.EnumType"))
+                {
+                    fieldType = OFTString; //FIXME: OFTInteger in Interlis 1
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.BooleanType"))
+                {
+                    fieldType = OFTString; //??
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.NumType"))
+                { //// Unit INTERLIS.ANYUNIT, INTERLIS.TIME, INTERLIS.h, INTERLIS.min, INTERLIS.s, INTERLIS.M, INTERLIS.d
+                    fieldType = OFTReal;
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.CoordType"))
+                {
+                    geomType = wkbPoint; // = (dim > 2) ? wkbPoint25D : wkbPoint;
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.LineType"))
+                { // Kind DirectedPolyline, Polyline(CoordType RoadsExdm2ben.Point2D), Area
+                    geomType = wkbPolygon; //FIXME: check 'Kind' for wkbMultiLineString
+                }
+                else
+                {
+                    //MultiValue // e.g. Axes, SurfaceEdge.LineAttrs, SurfaceBoundary.Lines, LineGeometry.Segments
+                    //ClassRefType
+                    CPLError(CE_Warning, CPLE_NotSupported,
+                        "Field '%s' of class %s has unsupported type %s", psName, poTableDefn->GetName(), typeName);
+                }
+            }
+            if (geomType != wkbUnknown)
+            {
+                OGRGeomFieldDefn fieldDef(psName, geomType);
+                //oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
+                poTableDefn->AddGeomFieldDefn(&fieldDef);
+                CPLDebug( "OGR_ILI", "Adding geometry field %s to Class %s", psName, poTableDefn->GetName());                
+            } else {
+                OGRFieldDefn fieldDef(psName, fieldType);
+                poTableDefn->AddFieldDefn(&fieldDef);
+                CPLDebug( "OGR_ILI", "Adding field %s to Class %s", psName, poTableDefn->GetName());                
+            }
         }
     }
 };
