@@ -6,20 +6,20 @@
 # Project:  GDAL/OGR Test Suite
 # Purpose:  Interlis driver testing.
 # Author:   Pirmin Kalberer <pka(at)sourcepole.ch>
-# 
+#
 ###############################################################################
 # Copyright (c) 2012, Pirmin Kalberer <pka(at)sourcepole.ch>
-# 
+#
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Library General Public
 # License as published by the Free Software Foundation; either
 # version 2 of the License, or (at your option) any later version.
-# 
+#
 # This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Library General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Library General Public
 # License along with this library; if not, write to the
 # Free Software Foundation, Inc., 59 Temple Place - Suite 330,
@@ -27,11 +27,9 @@
 ###############################################################################
 
 import os
-import shutil
 import sys
-import string
 
-sys.path.append( '../pymod' )
+sys.path.append('../pymod')
 
 import gdaltest
 import ogrtest
@@ -608,18 +606,17 @@ def ogr_interlis2_2():
     if ds is None:
         return 'fail'
 
-    if ds.GetLayerCount() != 8:
+    layers = ['RoadsExdm2ben.Roads.LAttrs',
+              'RoadsExdm2ben.Roads.LandCover',
+              'RoadsExdm2ben.Roads.Street',
+              'RoadsExdm2ben.Roads.StreetNamePosition',
+              'RoadsExdm2ien.RoadsExtended.StreetAxis',
+              'RoadsExdm2ien.RoadsExtended.RoadSign']
+
+    if ds.GetLayerCount() != len(layers):
         gdaltest.post_reason( 'layer count wrong.' )
         return 'fail'
 
-    layers = ['RoadsExdm2ien.RoadsExtended.RoadSign',
-              'RoadsExdm2ien.RoadsExtended.StreetAxis',
-              'RoadsExdm2ben.Roads.RoadSign',
-              'RoadsExdm2ben.Roads.StreetAxis',
-              'RoadsExdm2ben.Roads.LandCover',
-              'RoadsExdm2ben.Roads.StreetNamePosition',
-              'RoadsExdm2ben.Roads.Street',
-              'RoadsExdm2ben.Roads.LAttrs']
     for i in range(ds.GetLayerCount()):
       if not ds.GetLayer(i).GetName() in layers:
           gdaltest.post_reason( 'Did not get right layers' )
@@ -632,10 +629,10 @@ def ogr_interlis2_2():
 
     feat = lyr.GetNextFeature()
 
-    #field_values = ['501', 'prohibition.noparking', 'POINT (168.27 170.85)']
-    field_values = ['prohibition.noparking', 'POINT (168.27 170.85)']
+    field_values = [501, 'prohibition.noparking', 'POINT (69.389 92.056)']
 
     if feat.GetFieldCount() != len(field_values)-1:
+        feat.DumpReadable()
         gdaltest.post_reason( 'field count wrong.' )
         return 'fail'
 

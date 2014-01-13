@@ -46,10 +46,10 @@ class IliClass
 public:
     OGRFeatureDefn* poTableDefn;
     NodeVector oFields;
-    std::vector<IliClass*> oRoleParents;
-    IliClass* psBaseClass;
+    bool isAssocClass;
+    bool hasDerivedClasses;
 
-    IliClass(OGRFeatureDefn* poTableDefnIn) : poTableDefn(poTableDefnIn), oFields(), oRoleParents(), psBaseClass(NULL)
+    IliClass(OGRFeatureDefn* poTableDefnIn) : poTableDefn(poTableDefnIn), oFields(), isAssocClass(false), hasDerivedClasses(false)
     {
     };
     ~IliClass()
@@ -58,50 +58,29 @@ public:
     };
     void AddFieldNode(CPLXMLNode* node, int iOrderPos)
     {
-        if (iOrderPos >= oFields.size())
+        if (iOrderPos >= (int)oFields.size())
             oFields.resize(iOrderPos+1);
         //CPLDebug( "OGR_ILI", "Register field with OrderPos %d to Class %s", iOrderPos, poTableDefn->GetName());
         oFields[iOrderPos] = node;
     }
-    void AddRoleNode(CPLXMLNode* node, int iOrderPos, IliClass* psBaseClass)
+    void AddRoleNode(CPLXMLNode* node, int iOrderPos)
     {
+        isAssocClass = true;
         AddFieldNode(node, iOrderPos);
-        oRoleParents.resize(oFields.size());
-        oRoleParents[iOrderPos] = psBaseClass;
     }
-    void AddEmbeddedAssocFields()
+    bool isEmbedded()
     {
-        CPLXMLNode* embeddedRoleField = NULL;
-        for (int i = 0; i < oFields.size(); ++i)
-            if (oFields[i])
+        if (isAssocClass)
+            for (NodeVector::const_iterator it = oFields.begin(); it != oFields.end(); ++it)
             {
-                if (CSLTestBoolean(CPLGetXMLValue( oFields[i], "EmbeddedTransfer", "FALSE" )))
-                {
-                    embeddedRoleField = oFields[i];
-                }
+                if (*it == NULL) continue;
+                if (CSLTestBoolean(CPLGetXMLValue( *it, "EmbeddedTransfer", "FALSE" )))
+                    return true;
             }
-        if (embeddedRoleField) // append to parent of opposite role
-        {
-        for (int i = 0; i < oFields.size(); ++i)
-            if (oFields[i] != embeddedRoleField)
-            {
-                IliClass* oRoleParent = oRoleParents[i];
-                oRoleParent->AddFieldNode(embeddedRoleField, oRoleParent->oFields.size());
-            }
-        }
-    }
-    void AddInhertedFields(IliClass* psDerivedClass)
-    {
-        if (psBaseClass)
-            psBaseClass->AddInhertedFields(psDerivedClass);
-        if (psDerivedClass != this)
-            for (int i = 0; i < oFields.size(); ++i)
-                if (oFields[i])
-                    psDerivedClass->AddFieldNode(oFields[i], i);
+        return false;
     }
     void AddFieldDefinitions(StrNodeMap& oTidLookup)
     {
-        AddInhertedFields(this);
         // add TID field
         OGRFieldDefn ofieldDefn("TID", OFTString);
         poTableDefn->AddFieldDefn(&ofieldDefn);
@@ -111,7 +90,7 @@ public:
             const char* psName = CPLGetXMLValue( *it, "Name", NULL );
             OGRFieldDefn fieldDef(psName, OFTString); //TODO: determine field type
             poTableDefn->AddFieldDefn(&fieldDef); //TODO: add geometry fields
-            CPLDebug( "OGR_ILI", "Adding field %s to Class %s -> %d", fieldDef.GetNameRef(), poTableDefn->GetName(), poTableDefn->GetFieldCount());
+            CPLDebug( "OGR_ILI", "Adding field %s to Class %s", fieldDef.GetNameRef(), poTableDefn->GetName());
         }
     }
 };
@@ -137,10 +116,6 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
     StrNodeMap oTidLookup; /* for fast lookup of REF relations */
     typedef std::map<CPLXMLNode*,IliClass*> ClassesMap; /* all classes with XML node for lookup */
     ClassesMap oClasses;
-    typedef std::set<CPLXMLNode*> NodeSet;
-    NodeSet oFields; /* AttrOrParam nodes */
-    NodeSet oRoles; /* Role nodes */
-    std::map<CPLString,const char*> oBaseClasses; /* Assoc REF -> BaseClass REF */
     const char *modelName;
 
     /* Fill TID lookup map and IliClasses lookup map */
@@ -148,7 +123,7 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
     while( psModel != NULL )
     {
         modelName = CPLGetXMLValue( psModel, "BID", NULL );
-        CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Model: '%s'", modelName);
+        //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Model: '%s'", modelName);
         CPLXMLNode* psEntry = psModel->psChild;
         while( psEntry != NULL )
         {
@@ -168,77 +143,57 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
                     //poTableDefn->DeleteGeomFieldDefn(0);
                     oClasses[psEntry] = new IliClass(poTableDefn);
                 }
-                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.AttrOrParam") && !EQUAL(modelName, "MODEL.INTERLIS"))
+            }
+            psEntry = psEntry->psNext;
+        }
+
+        // 2nd pass: add fields via TransferElement entries & role associations
+        psEntry = psModel->psChild;
+        while( psEntry != NULL )
+        {
+            if (psEntry->eType != CXT_Attribute) //ignore BID
+            {
+                //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Node tag: '%s'", psEntry->pszValue);
+                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.TransferElement") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
-                    //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "AttrOrParam Name: '%s'", psName);
-                    oFields.insert(psEntry);
+                    const char* psClassRef = CPLGetXMLValue( psEntry, "TransferClass.REF", NULL );
+                    const char* psElementRef = CPLGetXMLValue( psEntry, "TransferElement.REF", NULL );
+                    int iOrderPos = atoi(CPLGetXMLValue( psEntry, "TransferElement.ORDER_POS", "0" ))-1;
+                    IliClass* psParentClass = oClasses[oTidLookup[psClassRef]];
+                    CPLXMLNode* psElementNode = oTidLookup[psElementRef];
+                    psParentClass->AddFieldNode(psElementNode, iOrderPos);
                 }
                 if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Role") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
-                    //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Role Name: '%s'", psName);
-                    oRoles.insert(psEntry);
-                }
-                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.BaseClass") && !EQUAL(modelName, "MODEL.INTERLIS"))
-                {
-                    const char* psEntryRef = CPLGetXMLValue( psEntry, "CRT.REF", NULL );
-                    const char* psBaseClassRef = CPLGetXMLValue( psEntry, "BaseClass.REF", NULL );
-                    //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "BaseClass: '%s'->'%s'", psEntryRef, psBaseClassRef);
-                    oBaseClasses[psEntryRef] = psBaseClassRef;
+                    const char* psRefParent = CPLGetXMLValue( psEntry, "Association.REF", NULL );
+                    int iOrderPos = atoi(CPLGetXMLValue( psEntry, "Association.ORDER_POS", "0" ))-1;
+                    IliClass* psParentClass = oClasses[oTidLookup[psRefParent]];
+                    if (psParentClass)
+                        psParentClass->AddRoleNode(psEntry, iOrderPos);
                 }
             }
             psEntry = psEntry->psNext;
+
         }
 
         psModel = psModel->psNext;
     }
 
-    /* Collect fields */
-    for (NodeSet::const_iterator it = oFields.begin(); it != oFields.end(); ++it)
-    {
-        const char* psName = CPLGetXMLValue( *it, "Name", NULL );
-        const char* psRefParent = CPLGetXMLValue( *it, "AttrParent.REF", NULL );
-        int iOrderPos = atoi(CPLGetXMLValue( *it, "AttrParent.ORDER_POS", "0" ))-1;
-        CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Field: '%s' [%d] (%s)", psName, iOrderPos, psRefParent);
-        IliClass* psParentClass = oClasses[oTidLookup[psRefParent]];
-        if (psParentClass)
-        {
-            psParentClass->AddFieldNode(*it, iOrderPos);
-        } else {
-            CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Error in AttrParent lookup of Field: '%s'", psName);
-        }
-    }
-    for (NodeSet::const_iterator it = oRoles.begin(); it != oRoles.end(); ++it)
-    {
-        const char* psName = CPLGetXMLValue( *it, "Name", NULL );
-        const char* psRefParent = CPLGetXMLValue( *it, "Association.REF", NULL );
-        int iOrderPos = atoi(CPLGetXMLValue( *it, "Association.ORDER_POS", "0" ))-1;
-        CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Role: '%s' [%d] (%s)", psName, iOrderPos, psRefParent);
-        IliClass* psParentClass = oClasses[oTidLookup[psRefParent]];
-        const char* psTID = CPLGetXMLValue( *it, "TID", NULL );
-        IliClass* psBaseClass = oClasses[oTidLookup[oBaseClasses[psTID]]];
-        if (psParentClass && psBaseClass)
-        {
-            psParentClass->AddRoleNode(*it, iOrderPos, psBaseClass);
-        } else {
-            CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Error in Association lookup of Role: '%s'", psName);
-        }
-    }
-
-    /* Analyze class inheritance */
+    /* Analyze class inheritance & add fields to class table defn */
     for (ClassesMap::const_iterator it = oClasses.begin(); it != oClasses.end(); ++it)
     {
         //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Class: '%s'", it->second->poTableDefn->GetName());
         const char* psRefSuper = CPLGetXMLValue( it->first, "Super.REF", NULL );
         if (psRefSuper)
-            it->second->psBaseClass = oClasses[oTidLookup[psRefSuper]];
-        it->second->AddEmbeddedAssocFields();
+            oClasses[oTidLookup[psRefSuper]]->hasDerivedClasses = true;
+        it->second->AddFieldDefinitions(oTidLookup);
     }
 
-    /* Add fields to class table defn */
+    /* Filter relevant classes */
     for (ClassesMap::const_iterator it = oClasses.begin(); it != oClasses.end(); ++it)
     {
-        it->second->AddFieldDefinitions(oTidLookup);
-        poTableList.push_back(it->second->poTableDefn); //TODO: omit classes with descendants
+        if (!it->second->hasDerivedClasses && !it->second->isEmbedded())
+            poTableList.push_back(it->second->poTableDefn);
     }
 
     CPLDestroyXMLNode(psRootNode);
