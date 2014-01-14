@@ -81,6 +81,8 @@ public:
     }
     void AddFieldDefinitions(StrNodeMap& oTidLookup)
     {
+        // Delete default geometry field
+        poTableDefn->DeleteGeomFieldDefn(0);
         // add TID field
         OGRFieldDefn ofieldDefn("TID", OFTString);
         poTableDefn->AddFieldDefn(&ofieldDefn);
@@ -187,9 +189,6 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
                 {
                     //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Class Name: '%s'", psTID);
                     OGRFeatureDefn* poTableDefn = new OGRFeatureDefn(psTID);
-                    poTableDefn->SetGeomType( wkbUnknown );
-                    // Delete default geometry field
-                    //poTableDefn->DeleteGeomFieldDefn(0);
                     oClasses[psEntry] = new IliClass(poTableDefn);
                 }
             }

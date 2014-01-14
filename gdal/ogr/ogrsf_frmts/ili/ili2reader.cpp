@@ -267,7 +267,7 @@ OGRLineString *getLineString(DOMElement *elem, int bAsLinearRing) {
       delete ptStart;
       delete ptEnd;
       delete ptOnArc;
-    } /* else { // FIXME StructureValue in Polyline not yet supported
+    } /* else { // TODO: StructureValue in Polyline not yet supported
     } */
     XMLString::release(&pszTagName);
 
@@ -385,26 +385,15 @@ int ILI2Reader::ReadModel(char **modelFilenames) {
 }
 
 char* fieldName(DOMElement* elem) {
-  string fullname;
   int depth = 0;
   DOMNode *node;
   for (node = elem; node; node = node->getParentNode()) ++depth;
-  depth-=3; //ignore root elements
-
-// We cannot do this sort of dynamic stack alloc on MSVC6.
-//  DOMNode* elements[depth];
-  DOMNode* elements[1000];
-  CPLAssert( depth < (int)(sizeof(elements) / sizeof(DOMNode*)) );
-
-  int d=0;
-  for (node = elem; d<depth; node = node->getParentNode()) elements[d++] = node;
-  for (d=depth-1; d>=0; --d) {
-    if (d < depth-1) fullname += "_";
-    char* pszNodeName = XMLString::transcode(elements[d]->getNodeName());
-    fullname += pszNodeName;
-    XMLString::release(&pszNodeName);
-  }
-  return CPLStrdup(fullname.c_str());
+  node = elem;
+  for (int d = 0; d<depth-4; ++d) node = node->getParentNode();
+  char* pszNodeName = XMLString::transcode(node->getNodeName());
+  char* pszRet = CPLStrdup(pszNodeName);
+  XMLString::release(&pszNodeName);
+  return pszRet;
 }
 
 void ILI2Reader::setFieldDefn(OGRFeatureDefn *featureDef, DOMElement* elem) {
@@ -456,12 +445,10 @@ void ILI2Reader::SetFieldValues(OGRFeature *feature, DOMElement* elem) {
         CPLFree(fName);
       }
     } else {
-      char *fName = fieldName(childElem); //FIXME: wrong names 'Geometry_SURFACE', 'Geometry_POLYLINE', 'NamPos_COORD', 'Position_COORD'
-      //CPLDebug( "OGR_ILI","Setting geometry value of Attribute '%s'", fName);
-      //TODO (multigeom):
-      // int fIndex = feature->GetGeomFieldIndex(fName);
-      // feature->SetGeomFieldDirectly(fIndex, getGeometry(childElem, type));
-      feature->SetGeometryDirectly(getGeometry(childElem, type));
+      char *fName = fieldName(childElem);
+      int fIndex = feature->GetGeomFieldIndex(fName);
+      feature->SetGeomFieldDirectly(fIndex, getGeometry(childElem, type));
+      CPLFree(fName);
     }
   }
 }
