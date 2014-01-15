@@ -104,108 +104,8 @@ int ILI1Reader::OpenFile( const char *pszFilename ) {
 }
 
 const char* ILI1Reader::GetLayerNameString(const char* topicname, const char* tablename) {
-    static char layername[512];
-    layername[0] = '\0';
-    strcat(layername, topicname);
-    strcat(layername, "__");
-    strcat(layername, tablename);
-    return layername;
-}
 
-const char* ILI1Reader::GetLayerName(IOM_BASKET model, IOM_OBJECT table) {
-    static char layername[512];
-    IOM_OBJECT topic = GetAttrObj(model, table, "container");
-    layername[0] = '\0';
-    strcat(layername, iom_getattrvalue(topic, "name"));
-    strcat(layername, "__");
-    strcat(layername, iom_getattrvalue(table, "name"));
-    return layername;
-}
-
-void ILI1Reader::AddCoord(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT modelele, IOM_OBJECT typeobj) {
-  unsigned int dim = ::GetCoordDim(model, typeobj);
-  for (unsigned int i=0; i<dim; i++) {
-    OGRFieldDefn fieldDef(CPLSPrintf("%s_%d", iom_getattrvalue(modelele, "name"), i), OFTReal);
-    layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-    //CPLDebug( "AddCoord   OGR_ILI", "Field %s: OFTReal", fieldDef.GetNameRef());
-  }
-  OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
-  OGRGeomFieldDefn oGFld(iom_getattrvalue(modelele, "name"), geomType);
-  oGFld.SetSpatialRef(layer->GetSpatialRef());
-  layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
-}
-
-OGRILI1Layer* ILI1Reader::AddGeomTable(const char* datalayername, const char* geomname, OGRwkbGeometryType eType) {
-  static char layername[512];
-  layername[0] = '\0';
-  strcat(layername, datalayername);
-  strcat(layername, "_");
-  strcat(layername, geomname);
-
-  OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(layername);
-  poFeatureDefn->SetGeomType(eType);
-  OGRILI1Layer* geomlayer = new OGRILI1Layer(poFeatureDefn, NULL);
-  AddLayer(geomlayer);
-  OGRFieldDefn fieldDef("_TID", OFTString);
-  geomlayer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-  if (eType == wkbPolygon)
-  {
-     OGRFieldDefn fieldDefRef("_RefTID", OFTString);
-     geomlayer->GetLayerDefn()->AddFieldDefn(&fieldDefRef);
-  }
-  OGRFieldDefn fieldDef2("ILI_Geometry", OFTString); //in write mode only?
-  geomlayer->GetLayerDefn()->AddFieldDefn(&fieldDef2);
-
-  OGRGeomFieldDefn oGFld(geomname, eType);
-  oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
-  geomlayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
-
-  return geomlayer;
-}
-
-void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj) {
-  const char* typenam = "Reference";
-  if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.LocalAttribute")) typenam = GetTypeName(model, obj);
-  CPLDebug( "OGR_ILI", "Field %s: %s", iom_getattrvalue(obj, "name"), typenam);
-  if (EQUAL(typenam, "iom04.metamodel.SurfaceType")) {
-    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPolygon);
-    oGFld.SetSpatialRef(layer->GetSpatialRef());
-    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
-    OGRILI1Layer* polyLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbPolygon);
-    layer->SetSurfacePolyLayer(polyLayer, layer->GetLayerDefn()->GetGeomFieldCount()-1); //TODO: support multiple surface geoms in layer -> use metadata struct
-    //TODO: add line attributes to geometry
-  } else if (EQUAL(typenam, "iom04.metamodel.AreaType")) {
-    IOM_OBJECT controlPointDomain = GetAttrObj(model, GetTypeObj(model, obj), "controlPointDomain");
-    if (controlPointDomain) {
-      AddCoord(layer, model, obj, GetTypeObj(model, controlPointDomain));
-    }
-    OGRILI1Layer* areaLineLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbMultiLineString);
-#ifdef POLYGONIZE_AREAS
-    OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(CPLSPrintf("%s__Areas",layer->GetLayerDefn()->GetName()));
-    poFeatureDefn->SetGeomType( wkbPolygon );
-    OGRILI1Layer* areaLayer = new OGRILI1Layer(poFeatureDefn, NULL);
-    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPolygon);
-    oGFld.SetSpatialRef(areaLayer->GetSpatialRef());
-    areaLayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
-    AddLayer(areaLayer);
-    areaLayer->SetAreaLayers(layer, areaLineLayer); //TODO: support multiple area geoms in layer -> use metadata struct
-#endif
-  } else if (EQUAL(typenam, "iom04.metamodel.PolylineType") ) {
-    OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbMultiLineString);
-    oGFld.SetSpatialRef(layer->GetSpatialRef());
-    layer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
-  } else if (EQUAL(typenam, "iom04.metamodel.CoordType")) {
-    AddCoord(layer, model, obj, GetTypeObj(model, obj));
-  } else if (EQUAL(typenam, "iom04.metamodel.NumericType") ) {
-     OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTReal);
-     layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-  } else if (EQUAL(typenam, "iom04.metamodel.EnumerationType") ) {
-     OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTInteger);
-     layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-  } else {
-    OGRFieldDefn fieldDef(iom_getattrvalue(obj, "name"), OFTString);
-    layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-  }
+    return CPLSPrintf("%s__%s", topicname, tablename);
 }
 
 int ILI1Reader::ReadModel(const char *pszModelFilename) {
@@ -401,7 +301,7 @@ int ILI1Reader::ReadTable(const char *layername) {
       if (EQUAL(firsttok, "OBJE"))
       {
         //Check for features spread over multiple objects
-        if (featureDef->GetGeomType() == wkbPolygon)
+        if (featureDef->GetGeomType() == wkbPolygon) //FIXME: Multi-geom support
         {
           //Multiple polygon rings
           feature = curLayer->GetFeatureRef(atol(CSLGetField(tokens, 2)));
@@ -419,7 +319,8 @@ int ILI1Reader::ReadTable(const char *layername) {
         {
           if (featureDef->GetFieldCount() == 0)
           {
-            CPLDebug( "OGR_ILI", "No field definition found for table: %s", featureDef->GetName() );
+            CPLError(CE_Warning, CPLE_AppDefined,
+                "No field definition found for table: %s", featureDef->GetName() );
             //Model not read - use heuristics
             for (fIndex=1; fIndex<CSLCount(tokens); fIndex++)
             {
@@ -459,7 +360,13 @@ int ILI1Reader::ReadTable(const char *layername) {
                 CPLString geomfldname = featureDef->GetFieldDefn(fieldno)->GetNameRef();
                 //Check if name ends with _1
                 if (geomfldname.size() >= 2 && geomfldname[geomfldname.size()-2] == '_') {
-                  geomIdx = featureDef->GetGeomFieldIndex(geomfldname.substr(0, geomfldname.size()-2).c_str());
+                  geomfldname = geomfldname.substr(0, geomfldname.size()-2);
+                  geomIdx = featureDef->GetGeomFieldIndex(geomfldname.c_str());
+                  if (geomIdx == -1)
+                  {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                        "No matching definition for field '%s' of table %s found", geomfldname.c_str(), featureDef->GetName());
+                  }
                 } else {
                   geomIdx = -1;
                 }
@@ -478,7 +385,8 @@ int ILI1Reader::ReadTable(const char *layername) {
             }
           }
           if (!warned && featureDef->GetFieldCount() != CSLCount(tokens)-1 && !(featureDef->GetFieldCount() == CSLCount(tokens) && EQUAL(featureDef->GetFieldDefn(featureDef->GetFieldCount()-1)->GetNameRef(), "ILI_Geometry"))) {
-            CPLDebug( "OGR_ILI", "Field count doesn't match. %d declared, %d found", featureDef->GetFieldCount(), CSLCount(tokens)-1);
+            CPLError(CE_Warning, CPLE_AppDefined,
+                "Field count doesn't match. %d declared, %d found", featureDef->GetFieldCount(), CSLCount(tokens)-1);
             warned = TRUE;
           }
           if (feature->GetFieldCount() > 0) {

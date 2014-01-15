@@ -70,7 +70,6 @@ def ogr_interlis1_2():
     ds = ogr.Open('data/ili/Beispiel.itf,data/ili/Beispiel.imd')
     layers = ['Bodenbedeckung__BoFlaechen',
               'Bodenbedeckung__BoFlaechen_Form',
-              'Bodenbedeckung__BoFlaechen__Areas',
               'Bodenbedeckung__Strasse',
               'Bodenbedeckung__Gebaeude']
     if ds.GetLayerCount() != len(layers):
@@ -490,8 +489,8 @@ def ogr_interlis1_12():
     feat = lyr.GetNextFeature()
 
     if feat.GetFieldCount() != 6:
+        feat.DumpReadable()
         gdaltest.post_reason( 'field count wrong.' )
-        print feat.GetFieldCount()
         return 'fail'
 
     geom_columns = ['coordPoint1', 'coordPoint2']

@@ -40,11 +40,13 @@ CPL_CVSID("$Id$");
 
 typedef std::map<CPLString,CPLXMLNode*> StrNodeMap;
 typedef std::vector<CPLXMLNode*> NodeVector;
+typedef std::map<CPLXMLNode*,int> NodeCountMap;
 
 class IliClass
 {
 public:
     OGRFeatureDefn* poTableDefn;
+    FeatureDefnList oAdditionalTableDefs;
     NodeVector oFields;
     bool isAssocClass;
     bool hasDerivedClasses;
@@ -79,19 +81,51 @@ public:
             }
         return false;
     }
-    OGRwkbGeometryType AddCoord(int iliVersion, const char* psName, CPLXMLNode* psTypeNode) {
-      unsigned int dim = 2; //FIXME
-      if (iliVersion == 1)
-      {
-          for (unsigned int i=0; i<dim; i++) {
-            OGRFieldDefn fieldDef(CPLSPrintf("%s_%d", psName, i), OFTReal);
-            poTableDefn->AddFieldDefn(&fieldDef);
-          } 
-      }
-      OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
-      return geomType;
+    // Add additional Geometry table for Interlis 1
+    void AddGeomTable(CPLString layerName, const char* psFieldName, OGRwkbGeometryType eType)
+    {
+        OGRFeatureDefn* poGeomTableDefn = new OGRFeatureDefn(layerName);
+        OGRFieldDefn fieldDef("_TID", OFTString);
+        poGeomTableDefn->AddFieldDefn(&fieldDef);
+        if (eType == wkbPolygon)
+        {
+            OGRFieldDefn fieldDefRef("_RefTID", OFTString);
+            poGeomTableDefn->AddFieldDefn(&fieldDefRef);
+        }
+        poGeomTableDefn->DeleteGeomFieldDefn(0);
+        OGRGeomFieldDefn fieldDefGeom(psFieldName, eType);
+        poGeomTableDefn->AddGeomFieldDefn(&fieldDefGeom);
+        CPLDebug( "OGR_ILI", "Adding geometry field %s to Class %s", psFieldName, poGeomTableDefn->GetName());
+        oAdditionalTableDefs.push_back(poGeomTableDefn);
     }
-    void AddFieldDefinitions(int iliVersion, StrNodeMap& oTidLookup)
+    void AddField(const char* psName, OGRFieldType fieldType)
+    {
+        OGRFieldDefn fieldDef(psName, fieldType);
+        poTableDefn->AddFieldDefn(&fieldDef);
+        CPLDebug( "OGR_ILI", "Adding field %s to Class %s", psName, poTableDefn->GetName());                
+    }
+    void AddGeomField(const char* psName, OGRwkbGeometryType geomType)
+    {
+        OGRGeomFieldDefn fieldDef(psName, geomType);
+        //oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
+        poTableDefn->AddGeomFieldDefn(&fieldDef);
+        CPLDebug( "OGR_ILI", "Adding geometry field %s to Class %s", psName, poTableDefn->GetName());                
+    }
+    void AddCoord(int iliVersion, const char* psName, CPLXMLNode* psTypeNode, NodeCountMap& oAxisCount)
+    {
+        int dim = oAxisCount[psTypeNode];
+        if (dim == 0) dim = 2; //Area center points have no Axis spec
+        if (iliVersion == 1)
+        {
+            for (int i=0; i<dim; i++)
+            {
+                AddField(CPLSPrintf("%s_%d", psName, i), OFTReal);
+            }
+        }
+        OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
+        AddGeomField(psName, geomType);
+    }
+    void AddFieldDefinitions(int iliVersion, StrNodeMap& oTidLookup, NodeCountMap& oAxisCount)
     {
         // Delete default geometry field
         poTableDefn->DeleteGeomFieldDefn(0);
@@ -104,48 +138,69 @@ public:
             if (*it == NULL) continue;
             const char* psName = CPLGetXMLValue( *it, "Name", NULL );
             const char* psTypeRef = CPLGetXMLValue( *it, "Type.REF", NULL );
-            OGRFieldType fieldType = OFTString;
-            OGRwkbGeometryType geomType = wkbUnknown;
             if (psTypeRef == NULL) //Assoc Role
-                fieldType = OFTString; //FIXME: numeric?
+                AddField(psName, OFTString); //FIXME: numeric?
             else
             {
                 CPLXMLNode* psElementNode = oTidLookup[psTypeRef];
                 const char* typeName = psElementNode->pszValue;
                 if (EQUAL(typeName, "IlisMeta07.ModelData.TextType"))
                 { //Kind Text,MText
-                    fieldType = OFTString;
+                    AddField(psName, OFTString);
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.EnumType"))
                 {
-                    fieldType = (iliVersion == 1) ? OFTInteger : OFTString;
+                    AddField(psName, (iliVersion == 1) ? OFTInteger : OFTString);
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.BooleanType"))
                 {
-                    fieldType = OFTString; //??
+                    AddField(psName, OFTString); //??
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.NumType"))
                 { //// Unit INTERLIS.ANYUNIT, INTERLIS.TIME, INTERLIS.h, INTERLIS.min, INTERLIS.s, INTERLIS.M, INTERLIS.d
-                    fieldType = OFTReal;
+                    AddField(psName, OFTReal);
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.CoordType"))
                 {
-                    geomType = AddCoord(iliVersion, psName, psElementNode);
+                    AddCoord(iliVersion, psName, psElementNode, oAxisCount);
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.LineType"))
                 {
                     const char* psKind = CPLGetXMLValue( psElementNode, "Kind", NULL );
-                    if (EQUAL(psKind, "Area"))  // Kind DirectedPolyline, Polyline(CoordType RoadsExdm2ben.Point2D), Area
+                    if (iliVersion == 1)
                     {
-                        if (iliVersion == 1)
+                        if (EQUAL(psKind, "Area"))  // Kind DirectedPolyline, Polyline(CoordType RoadsExdm2ben.Point2D), Area
                         {
-                            geomType = AddCoord(iliVersion, psName, psElementNode);
-                            //Add geomType = wkbMultiLineString
+                            CPLString areaPointGeomName = psName + CPLString("__Point");
+                            AddCoord(iliVersion, areaPointGeomName, psElementNode, oAxisCount);
+
+                            CPLString lineLayerName = poTableDefn->GetName() + CPLString("_") + psName;
+                            AddGeomTable(lineLayerName, psName, wkbMultiLineString);
+
+                            // OGR 1.10 had a seperate areay polygon table:
+                            // CPLString areaLayerName = poTableDefn->GetName() + CPLString("__Areas");
+                            // AddGeomTable(areaLayerName, psName, wkbPolygon);
+                            // areaLayer->SetAreaLayers(layer, areaLineLayer);
+
+                            //Add geometry field for polygonized areas
+                            AddGeomField(psName, wkbPolygon);
+                        } else if (EQUAL(psKind, "Surface"))
+                        {
+                            CPLString geomLayerName = poTableDefn->GetName() + CPLString("_") + psName;
+                            AddGeomTable(geomLayerName, psName, wkbPolygon);
+                            //layer->SetSurfacePolyLayer(polyLayer, layer->GetLayerDefn()->GetGeomFieldCount()-1);
                         } else {
-                            geomType = wkbPolygon;
+                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s to Class %s", psKind, poTableDefn->GetName());                
+                            AddGeomField(psName, wkbMultiLineString);
                         }
                     } else {
-                        geomType = wkbMultiLineString;
+                        if (EQUAL(psKind, "Area") || EQUAL(psKind, "Surface"))
+                        {
+                            AddGeomField(psName, wkbPolygon);
+                        } else {
+                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s to Class %s", psKind, poTableDefn->GetName());                
+                            AddGeomField(psName, wkbMultiLineString);
+                        }
                     }
                 }
                 else
@@ -156,25 +211,19 @@ public:
                         "Field '%s' of class %s has unsupported type %s", psName, poTableDefn->GetName(), typeName);
                 }
             }
-            if (geomType == wkbPolygon && iliVersion == 1)
-            {
-                psName = "_RefTID";
-                fieldType = OFTString;
-                geomType = wkbUnknown;
-            }
-            if (geomType != wkbUnknown)
-            {
-                OGRGeomFieldDefn fieldDef(psName, geomType);
-                //oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
-                poTableDefn->AddGeomFieldDefn(&fieldDef);
-                CPLDebug( "OGR_ILI", "Adding geometry field %s to Class %s", psName, poTableDefn->GetName());                
-            } else {
-                OGRFieldDefn fieldDef(psName, fieldType);
-                poTableDefn->AddFieldDefn(&fieldDef);
-                CPLDebug( "OGR_ILI", "Adding field %s to Class %s", psName, poTableDefn->GetName());                
-            }
         }
     }
+    FeatureDefnList tableDefs()
+    {
+        FeatureDefnList poTableList;
+        if (!hasDerivedClasses && !isEmbedded())
+        {
+            poTableList.push_back(poTableDefn);
+            poTableList.insert(poTableList.end(), oAdditionalTableDefs.begin(), oAdditionalTableDefs.end());
+        }
+        return poTableList;
+    }
+
 };
 
 
@@ -190,12 +239,11 @@ const char* ImdReader::LayerName(const char* psClassTID) {
         char **papszTokens =
             CSLTokenizeString2( psClassTID, ".", CSLT_ALLOWEMPTYTOKENS );
 
-        static char layername[512]; //FIXME
-        layername[0] = '\0';
+        CPLString layername;
         for(int i = 1; papszTokens != NULL && papszTokens[i] != NULL; i++)
         {
-            if (i>1) strcat(layername, "__");
-            strcat(layername, papszTokens[i]);
+            if (i>1) layername += "__";
+            layername += papszTokens[i];
         }
         CSLDestroy( papszTokens );
         return layername;
@@ -204,9 +252,9 @@ const char* ImdReader::LayerName(const char* psClassTID) {
     }
 }
 
-std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
+FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
     CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Reading model '%s'", pszFilename);
-    std::list<OGRFeatureDefn*> poTableList;
+    FeatureDefnList poTableList;
 
     CPLXMLNode* psRootNode = CPLParseXMLFile(pszFilename);
     if( psRootNode == NULL )
@@ -218,6 +266,7 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
     StrNodeMap oTidLookup; /* for fast lookup of REF relations */
     typedef std::map<CPLXMLNode*,IliClass*> ClassesMap; /* all classes with XML node for lookup */
     ClassesMap oClasses;
+    NodeCountMap oAxisCount;
     const char *modelName;
 
     /* Fill TID lookup map and IliClasses lookup map */
@@ -262,13 +311,20 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
                     CPLXMLNode* psElementNode = oTidLookup[psElementRef];
                     psParentClass->AddFieldNode(psElementNode, iOrderPos);
                 }
-                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Role") && !EQUAL(modelName, "MODEL.INTERLIS"))
+                else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Role") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
                     const char* psRefParent = CPLGetXMLValue( psEntry, "Association.REF", NULL );
                     int iOrderPos = atoi(CPLGetXMLValue( psEntry, "Association.ORDER_POS", "0" ))-1;
                     IliClass* psParentClass = oClasses[oTidLookup[psRefParent]];
                     if (psParentClass)
                         psParentClass->AddRoleNode(psEntry, iOrderPos);
+                }
+                else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.AxisSpec") && !EQUAL(modelName, "MODEL.INTERLIS"))
+                {
+                    const char* psClassRef = CPLGetXMLValue( psEntry, "CoordType.REF", NULL );
+                    //int iOrderPos = atoi(CPLGetXMLValue( psEntry, "Axis.ORDER_POS", "0" ))-1;
+                    CPLXMLNode* psCoordTypeNode = oTidLookup[psClassRef];
+                    oAxisCount[psCoordTypeNode] += 1;
                 }
             }
             psEntry = psEntry->psNext;
@@ -285,14 +341,14 @@ std::list<OGRFeatureDefn*> ImdReader::ReadModel(const char *pszFilename) {
         const char* psRefSuper = CPLGetXMLValue( it->first, "Super.REF", NULL );
         if (psRefSuper)
             oClasses[oTidLookup[psRefSuper]]->hasDerivedClasses = true;
-        it->second->AddFieldDefinitions(iliVersion, oTidLookup);
+        it->second->AddFieldDefinitions(iliVersion, oTidLookup, oAxisCount);
     }
 
     /* Filter relevant classes */
     for (ClassesMap::const_iterator it = oClasses.begin(); it != oClasses.end(); ++it)
     {
-        if (!it->second->hasDerivedClasses && !it->second->isEmbedded())
-            poTableList.push_back(it->second->poTableDefn);
+        FeatureDefnList oClassTables = it->second->tableDefs();
+        poTableList.insert(poTableList.end(), oClassTables.begin(), oClassTables.end());
     }
 
     CPLDestroyXMLNode(psRootNode);

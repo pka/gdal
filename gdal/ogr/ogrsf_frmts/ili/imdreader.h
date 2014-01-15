@@ -36,6 +36,8 @@
 #include <list>
 
 
+typedef std::list<OGRFeatureDefn*> FeatureDefnList;
+
 class ImdReader
 {
     int                  iliVersion; /* 1 or 2 */
@@ -43,7 +45,7 @@ public:
                          ImdReader(int iliVersion);
                         ~ImdReader();
     const char*          LayerName(const char* psClassTID);
-    std::list<OGRFeatureDefn*> ReadModel(const char *pszFilename);
+    FeatureDefnList      ReadModel(const char *pszFilename);
 };
 
 #endif /* _IMDREADER_H_INCLUDED */
