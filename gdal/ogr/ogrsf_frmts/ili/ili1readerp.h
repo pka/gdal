@@ -32,7 +32,6 @@
 
 #include "ili1reader.h"
 #include "ogr_ili1.h"
-#include "imdreader.h"
 
 
 class ILI1Reader;

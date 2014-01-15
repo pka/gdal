@@ -42,6 +42,8 @@ class ImdReader
 {
 public:
     int                  iliVersion; /* 1 or 2 */
+    CPLString            mainModelName;
+    CPLString            mainTopicName;
     char                 codeBlank;
     char                 codeUndefined;
     char                 codeContinue;

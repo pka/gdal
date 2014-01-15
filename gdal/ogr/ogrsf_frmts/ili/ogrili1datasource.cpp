@@ -33,9 +33,6 @@
 
 #include "ili1reader.h"
 
-#include "iomhelper.h"
-#include "iom/iom.h"
-
 #include <string>
 
 CPL_CVSID("$Id$");
@@ -194,11 +191,6 @@ int OGRILI1DataSource::Create( const char *pszFilename,
 
     CSLDestroy( filenames );
 
-    if( osModelFilename.length() == 0 )
-    {
-      //TODO: create automatic model
-    }
-
 /* -------------------------------------------------------------------- */
 /*      Create the empty file.                                          */
 /* -------------------------------------------------------------------- */
@@ -217,29 +209,17 @@ int OGRILI1DataSource::Create( const char *pszFilename,
 /* -------------------------------------------------------------------- */
 /*      Parse model                                                     */
 /* -------------------------------------------------------------------- */
-    iom_init();
-
-    // set error listener to a iom provided one, that just
-    // dumps all errors to stderr
-    iom_seterrlistener(iom_stderrlistener);
-
-    IOM_BASKET model = 0;
-    if( osModelFilename.length() != 0 ) {
-      // compile ili model
-      char *iliFiles[1] = {(char *)osModelFilename.c_str()};
-      model=iom_compileIli(1,iliFiles);
-      if(!model){
-        CPLError( CE_Warning, CPLE_OpenFailed,
-                  "iom_compileIli %s, %s.",
-                  pszName, VSIStrerror( errno ) );
-        iom_end();
-        return FALSE;
-      }
+    ImdReader m_imdReader(1);
+    if( osModelFilename.length() == 0 )
+    {
+        CPLError(CE_Warning, CPLE_AppDefined,
+            "Creating Interlis transfer file without model definition." );
+    } else {
+        /* std::list<OGRFeatureDefn*> poTableList = */
+        m_imdReader.ReadModel(osModelFilename.c_str());
     }
 
-    pszTopic = CPLStrdup(model ?
-                         GetAttrObjName(model, "iom04.metamodel.Topic") :
-                         CPLGetBasename(osBasename.c_str()));
+    pszTopic = CPLStrdup(m_imdReader.mainTopicName.c_str());
 
 /* -------------------------------------------------------------------- */
 /*      Write headers                                                   */
@@ -248,9 +228,7 @@ int OGRILI1DataSource::Create( const char *pszFilename,
     VSIFPrintf( fpTransfer, "OGR/GDAL %s, INTERLIS Driver\n", GDAL_RELEASE_NAME );
     VSIFPrintf( fpTransfer, "////\n" );
     VSIFPrintf( fpTransfer, "MTID INTERLIS1\n" );
-    const char* modelname = model ?
-                            GetAttrObjName(model, "iom04.metamodel.DataModel") :
-                            CPLGetBasename(osBasename.c_str());
+    const char* modelname = m_imdReader.mainModelName.c_str();
     VSIFPrintf( fpTransfer, "MODL %s\n", modelname );
 
     return TRUE;

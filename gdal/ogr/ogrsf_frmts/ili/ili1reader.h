@@ -30,6 +30,7 @@
 #ifndef _CPL_ILI1READER_H_INCLUDED
 #define _CPL_ILI1READER_H_INCLUDED
 
+#include "imdreader.h"
 
 class CPL_DLL IILI1Reader
 {

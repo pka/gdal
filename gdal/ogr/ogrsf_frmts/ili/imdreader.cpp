@@ -228,6 +228,8 @@ public:
 
 
 ImdReader::ImdReader(int iliVersionIn) : iliVersion(iliVersionIn) {
+  mainModelName = "OGR";
+  mainTopicName = "OGR";
   codeBlank = '_';
   codeUndefined = '@';
   codeContinue = '\\';
@@ -292,6 +294,7 @@ FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
 
                 if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Model") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
+                    mainModelName = CPLGetXMLValue( psEntry, "Name", "OGR" ); //FIXME: check model inheritance
                     //version = CPLGetXMLValue(psEntry, "iliVersion", "0"); //1 or 2.3
 
                     CPLXMLNode *psFormatNode = CPLGetXMLNode( psEntry, "ili1Format" );
@@ -302,6 +305,10 @@ FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
                         codeUndefined = atoi(CPLGetXMLValue(psFormatNode, "undefinedCode", "64"));
                         codeContinue = atoi(CPLGetXMLValue(psFormatNode, "continueCode", "92"));
                     }
+                }
+                else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.SubModel") && !EQUAL(modelName, "MODEL.INTERLIS"))
+                {
+                    mainTopicName = CPLGetXMLValue(psEntry, "Name", "OGR");
                 }
                 else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Class") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
