@@ -55,12 +55,6 @@ def ogr_interlis1_1():
     except:
         return 'skip'
 
-    # Check ili2c.jar
-    ds = ogr.Open( 'data/ili/Beispiel.itf,data/ili/Beispiel.ili' )
-    if gdal.GetLastErrorMsg().find('iom_compileIli failed.') != -1:
-        gdaltest.post_reason( 'skipping test: ili2c.jar not found in PATH' )
-        return 'skip'
-
     gdaltest.have_ili_reader = 1
     
     return 'success'
@@ -73,7 +67,7 @@ def ogr_interlis1_2():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/Beispiel.itf,data/ili/Beispiel.ili' )
+    ds = ogr.Open('data/ili/Beispiel.itf,data/ili/Beispiel.imd')
     layers = ['Bodenbedeckung__BoFlaechen',
               'Bodenbedeckung__BoFlaechen_Form',
               'Bodenbedeckung__BoFlaechen__Areas',
@@ -130,7 +124,7 @@ def ogr_interlis1_3():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/format-default.itf,data/ili/format-default.ili' )
+    ds = ogr.Open('data/ili/format-default.itf,data/ili/format-default.imd')
 
     layers = ['FormatTests__FormatTable']
     if ds.GetLayerCount() != len(layers):
@@ -173,7 +167,7 @@ def ogr_interlis1_4():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/format-test.itf,data/ili/format-test.ili' )
+    ds = ogr.Open('data/ili/format-test.itf,data/ili/format-test.imd')
 
     layers = ['FormatTests__FormatTable']
     if ds.GetLayerCount() != len(layers):
@@ -216,7 +210,7 @@ def ogr_interlis1_5():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/format-default.itf,data/ili/format-default.ili' )
+    ds = ogr.Open('data/ili/format-default.itf,data/ili/format-default.imd')
 
     lyr = ds.GetLayerByName('FormatTests__FormatTable')
     feat = lyr.GetNextFeature()
@@ -243,12 +237,12 @@ def ogr_interlis1_6():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/format-default.itf,data/ili/format-default.ili' )
+    ds = ogr.Open('data/ili/format-default.itf,data/ili/format-default.imd')
     lyr = ds.GetLayerByName('FormatTests__FormatTable')
     feat = lyr.GetNextFeature()
 
     driver = ogr.GetDriverByName( 'Interlis 1' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis1_6.itf,data/ili/format-default.ili' )
+    dst_ds = driver.CreateDataSource('tmp/interlis1_6.itf,data/ili/format-default.imd')
 
     dst_lyr = dst_ds.CreateLayer( 'test' )
 
@@ -269,7 +263,7 @@ def ogr_interlis1_7():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/encoding-test.itf,data/ili/format-default.ili' )
+    ds = ogr.Open('data/ili/encoding-test.itf,data/ili/format-default.imd')
 
     layers = ['FormatTests__FormatTable']
     if ds.GetLayerCount() != len(layers):
@@ -419,7 +413,7 @@ def ogr_interlis1_11():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/multigeom.itf,data/ili/multigeom.ili' )
+    ds = ogr.Open('data/ili/multigeom.itf,data/ili/multigeom.imd')
 
     layers = ['MultigeomTests__MultigeomTable']
     if ds.GetLayerCount() != len(layers):
@@ -475,7 +469,7 @@ def ogr_interlis1_12():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/multicoord.itf,data/ili/multicoord.ili' )
+    ds = ogr.Open('data/ili/multicoord.itf,data/ili/multicoord.imd')
 
     layers = ['MulticoordTests__MulticoordTable']
     if ds.GetLayerCount() != len(layers):
@@ -523,7 +517,7 @@ def ogr_interlis1_13():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/surface.itf,data/ili/surface.ili' )
+    ds = ogr.Open('data/ili/surface.itf,data/ili/surface.imd')
 
     layers = ['SURFC_TOP__SURFC_TBL', 'SURFC_TOP__SURFC_TBL_SHAPE']
 
@@ -602,7 +596,7 @@ def ogr_interlis2_2():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/RoadsExdm2ien.xml,data/ili/RoadsExdm2ien.imd' )
+    ds = ogr.Open('data/ili/RoadsExdm2ien.xml,data/ili/RoadsExdm2ien.imd')
     if ds is None:
         return 'fail'
 
@@ -663,7 +657,7 @@ def ogr_interlis_arc1():
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/Beispiel.itf,data/ili/Beispiel.ili' )
+    ds = ogr.Open('data/ili/Beispiel.itf,data/ili/Beispiel.imd')
 
     length_0_1_deg = 72.7181992353 # Line length with 0.1 degree segments
 
@@ -714,7 +708,7 @@ def ogr_interlis_arc1():
     #0.1 deg instead of default (1 deg) (max deg for ili sementizer is about 1.3 degrees)
     os.environ['ARC_DEGREES'] = '0.1'
     #GML: gdal.SetConfigOption('OGR_ARC_STEPSIZE','0.1')
-    ds = ogr.Open( 'data/ili/Beispiel.itf,data/ili/Beispiel.ili' )
+    ds = ogr.Open('data/ili/Beispiel.itf,data/ili/Beispiel.imd')
 
     #Read Area lines
     lyr = ds.GetLayerByName('Bodenbedeckung__BoFlaechen_Form')

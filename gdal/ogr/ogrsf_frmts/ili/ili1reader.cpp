@@ -60,6 +60,7 @@ IILI1Reader::~IILI1Reader() {
 
 ILI1Reader::ILI1Reader() {
   fpItf = NULL;
+  m_imdReader = new ImdReader(1);
   nLayers = 0;
   papoLayers = NULL;
   curLayer = NULL;
@@ -68,18 +69,18 @@ ILI1Reader::ILI1Reader() {
   codeUndefined = '@';
   codeContinue = '\\';
   SetArcDegrees(1);
-
 }
 
 ILI1Reader::~ILI1Reader() {
- int i;
- if (fpItf) VSIFClose( fpItf );
+  int i;
+  if (fpItf) VSIFClose( fpItf );
 
- for(i=0;i<nLayers;i++)
+  for(i=0;i<nLayers;i++)
      delete papoLayers[i];
- CPLFree(papoLayers);
+  CPLFree(papoLayers);
+  delete m_imdReader;
 
- delete metaLayer;
+  delete metaLayer;
 }
 
 void ILI1Reader::SetArcDegrees(double arcDegrees) {
@@ -93,9 +94,9 @@ int ILI1Reader::OpenFile( const char *pszFilename ) {
     fpItf = VSIFOpen( pszFilename, "r" );
     if( fpItf == NULL )
     {
-          CPLError( CE_Failure, CPLE_OpenFailed,
-                    "Failed to open ILI file `%s'.",
-                    pszFilename );
+        CPLError( CE_Failure, CPLE_OpenFailed,
+                  "Failed to open ILI file `%s'.",
+                  pszFilename );
 
         return FALSE;
     }
@@ -141,7 +142,9 @@ OGRILI1Layer* ILI1Reader::AddGeomTable(const char* datalayername, const char* ge
   strcat(layername, "_");
   strcat(layername, geomname);
 
-  OGRILI1Layer* geomlayer = new OGRILI1Layer(layername, NULL, 0, eType, NULL);
+  OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(layername);
+  poFeatureDefn->SetGeomType(eType);
+  OGRILI1Layer* geomlayer = new OGRILI1Layer(poFeatureDefn, NULL);
   AddLayer(geomlayer);
   OGRFieldDefn fieldDef("_TID", OFTString);
   geomlayer->GetLayerDefn()->AddFieldDefn(&fieldDef);
@@ -178,7 +181,9 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
     }
     OGRILI1Layer* areaLineLayer = AddGeomTable(layer->GetLayerDefn()->GetName(), iom_getattrvalue(obj, "name"), wkbMultiLineString);
 #ifdef POLYGONIZE_AREAS
-    OGRILI1Layer* areaLayer = new OGRILI1Layer(CPLSPrintf("%s__Areas",layer->GetLayerDefn()->GetName()), NULL, 0, wkbPolygon, NULL);
+    OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(CPLSPrintf("%s__Areas",layer->GetLayerDefn()->GetName()));
+    poFeatureDefn->SetGeomType( wkbPolygon );
+    OGRILI1Layer* areaLayer = new OGRILI1Layer(poFeatureDefn, NULL);
     OGRGeomFieldDefn oGFld(iom_getattrvalue(obj, "name"), wkbPolygon);
     oGFld.SetSpatialRef(areaLayer->GetSpatialRef());
     areaLayer->GetLayerDefn()->AddGeomFieldDefn(&oGFld);
@@ -205,28 +210,18 @@ void ILI1Reader::AddField(OGRILI1Layer* layer, IOM_BASKET model, IOM_OBJECT obj)
 
 int ILI1Reader::ReadModel(const char *pszModelFilename) {
 
-  IOM_BASKET model;
-  IOM_ITERATOR modelelei;
-  IOM_OBJECT modelele;
-
-  iom_init();
-
-  // set error listener to a iom provided one, that just
-  // dumps all errors to stderr
-  iom_seterrlistener(iom_stderrlistener);
-
-  // compile ili model
-  char *iomarr[1] = {(char *)pszModelFilename};
-  model=iom_compileIli(1, iomarr);
-  if(!model){
-    CPLError( CE_Failure, CPLE_FileIO, "iom_compileIli failed." );
-    iom_end();
-    return FALSE;
+  std::list<OGRFeatureDefn*> poTableList = m_imdReader->ReadModel(pszModelFilename);
+  for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
+  {
+    OGRILI1Layer* layer = new OGRILI1Layer(*it, NULL);
+    AddLayer(layer);
   }
 
   // create new layer with meta information (ILI table name and geometry column index)
   // while reading the features from the ITF we have to know which column is the geometry column
-  metaLayer = new OGRILI1Layer("Metatable", NULL, 0, wkbUnknown, NULL);
+  OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn("Metatable");
+  poFeatureDefn->SetGeomType(wkbUnknown);
+  metaLayer = new OGRILI1Layer(poFeatureDefn, NULL);
   OGRFieldDefn fieldDef1("layername", OFTString);
   metaLayer->GetLayerDefn()->AddFieldDefn(&fieldDef1);
   OGRFieldDefn fieldDef2("geomIdx", OFTInteger);
@@ -235,82 +230,7 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
   metaLayer->GetLayerDefn()->AddFieldDefn(&fieldDef3);
 
 
-  // read tables
-  int j = 0;
-  modelelei=iom_iteratorobject(model);
-  modelele=iom_nextobject(modelelei);
-  while(modelele){
-    const char *tag=iom_getobjecttag(modelele);
-
-    if (tag) {
-      if (EQUAL(tag,"iom04.metamodel.Table")) {
-
-        const char* topic = iom_getattrvalue(GetAttrObj(model, modelele, "container"), "name");
-
-        if (!EQUAL(topic, "INTERLIS")) {
-
-          const char* layername = GetLayerName(model, modelele);
-          OGRSpatialReference *poSRSIn = NULL;
-          int bWriterIn = 0;
-          OGRwkbGeometryType eReqType = wkbUnknown;
-          OGRILI1DataSource *poDSIn = NULL;
-
-          CPLDebug( "OGR_ILI", "Reading table model '%s'", layername );
-
-          // read fields
-          IOM_OBJECT fields[255];
-          IOM_OBJECT roledefs[255];
-          memset(fields, 0, 255);
-          memset(roledefs, 0, 255);
-          int maxIdx = -1;
-          IOM_ITERATOR fieldit=iom_iteratorobject(model);
-          std::vector<IOM_OBJECT> attributes;
-
-          for (IOM_OBJECT fieldele=iom_nextobject(fieldit); fieldele; fieldele=iom_nextobject(fieldit)){
-            const char *etag=iom_getobjecttag(fieldele);
-
-            if (etag && (EQUAL(etag,"iom04.metamodel.ViewableAttributesAndRoles"))) {
-              IOM_OBJECT table = GetAttrObj(model, fieldele, "viewable");
-
-              if (table == modelele) {
-
-                IOM_OBJECT obj = GetAttrObj(model, fieldele, "attributesAndRoles");
-                int ili1AttrIdx = GetAttrObjPos(fieldele, "attributesAndRoles")-1;
-
-                if (EQUAL(iom_getobjecttag(obj),"iom04.metamodel.RoleDef")) {
-                  int ili1AttrIdxOppend = atoi(iom_getattrvalue(GetAttrObj(model, obj, "oppend"), "ili1AttrIdx"));
-
-                  if (ili1AttrIdxOppend>=0) {
-                    roledefs[ili1AttrIdxOppend] = obj;
-                    if (ili1AttrIdxOppend > maxIdx) maxIdx = ili1AttrIdxOppend;
-                  }
-                } else {
-                  fields[ili1AttrIdx] = obj;
-                  if (ili1AttrIdx > maxIdx) maxIdx = ili1AttrIdx;
-                }
-              }
-            }
-            iom_releaseobject(fieldele);
-          }
-          iom_releaseiterator(fieldit);
-
-          for (int i=0; i<=maxIdx; i++) {
-            IOM_OBJECT obj = fields[i];
-            if (obj) {
-              attributes.push_back(obj);
-            }
-          }
-
-          for (int i=0; i<=maxIdx; i++) {
-            IOM_OBJECT obj = roledefs[i];
-            if (obj) attributes.insert(attributes.begin() + i, obj);
-          }
-
-          OGRFeature *feature = NULL;
-          //char* geomlayername = '\0';
-          OGRILI1Layer* layer = NULL;
-
-          for(size_t i=0; i<attributes.size(); i++) {
+/*          for(size_t i=0; i<attributes.size(); i++) {
             IOM_OBJECT obj = attributes.at(i);
             const char* typenam = GetTypeName(model, obj);
             if (EQUAL(typenam, "iom04.metamodel.AreaType")) {
@@ -325,29 +245,21 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
               metaLayer->AddFeature(feature);
             }
           }
-
-          if(layer == NULL) {
+*/
+/*          if(layer == NULL) {
             layer = new OGRILI1Layer(layername, poSRSIn, bWriterIn, eReqType, poDSIn);
             AddLayer(layer);
           }
-
-          OGRFieldDefn fieldDef("_TID", OFTString);
-          layer->GetLayerDefn()->AddFieldDefn(&fieldDef);
-
-          for(size_t i=0; i<attributes.size(); i++) {
-            IOM_OBJECT obj = attributes.at(i);
-            AddField(layer, model, obj);
-          }
-
-          if (papoLayers[nLayers-1]->GetLayerDefn()->GetFieldCount() == 0) {
+*/
+/*          if (papoLayers[nLayers-1]->GetLayerDefn()->GetFieldCount() == 0) {
               //Area layer added
               OGRILI1Layer* areaLayer = papoLayers[nLayers-1];
               for (int i=0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
                 areaLayer->CreateField(layer->GetLayerDefn()->GetFieldDefn(i));
               }
           }
-        }
-      } else if (EQUAL(tag,"iom04.metamodel.Ili1Format")) {
+*/
+/*      } else if (EQUAL(tag,"iom04.metamodel.Ili1Format")) {
         codeBlank = atoi(iom_getattrvalue(modelele, "blankCode"));
         CPLDebug( "OGR_ILI", "Reading Ili1Format blankCode '%c'", codeBlank );
         codeUndefined = atoi(iom_getattrvalue(modelele, "undefinedCode"));
@@ -355,19 +267,7 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
         codeContinue = atoi(iom_getattrvalue(modelele, "continueCode"));
         CPLDebug( "OGR_ILI", "Reading Ili1Format continueCode '%c'", codeContinue );
       }
-      iom_releaseobject(modelele);
-
-      modelele=iom_nextobject(modelelei);
-      j++;
-    }
-  }
-
-  iom_releaseiterator(modelelei);
-
-  iom_releasebasket(model);
-
-  iom_end();
-
+*/
   return 0;
 }
 
@@ -420,11 +320,9 @@ int ILI1Reader::ReadFeatures() {
 
         if (curLayer == NULL) { //create one
           CPLDebug( "OGR_ILI", "No model found, using default field names." );
-          OGRSpatialReference *poSRSIn = NULL;
-          int bWriterIn = 0;
-          OGRwkbGeometryType eReqType = wkbUnknown;
-          OGRILI1DataSource *poDSIn = NULL;
-          curLayer = new OGRILI1Layer(GetLayerNameString(topic, CSLGetField(tokens, 1)), poSRSIn, bWriterIn, eReqType, poDSIn);
+          OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(GetLayerNameString(topic, CSLGetField(tokens, 1)));
+          poFeatureDefn->SetGeomType( wkbUnknown );
+          curLayer = new OGRILI1Layer(poFeatureDefn, NULL);
           AddLayer(curLayer);
         }
         if(curLayer != NULL) {

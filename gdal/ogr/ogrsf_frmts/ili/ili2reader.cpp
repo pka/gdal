@@ -466,7 +466,7 @@ ILI2Reader::ILI2Reader() {
     m_bReadStarted = FALSE;
 
     m_pszFilename = NULL;
-    m_imdReader = new ImdReader();
+    m_imdReader = new ImdReader(2);
 
     SetupParser();
 }

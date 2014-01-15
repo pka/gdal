@@ -38,9 +38,11 @@
 
 class ImdReader
 {
+    int                  iliVersion; /* 1 or 2 */
 public:
-                         ImdReader();
+                         ImdReader(int iliVersion);
                         ~ImdReader();
+    const char*          LayerName(const char* psClassTID);
     std::list<OGRFeatureDefn*> ReadModel(const char *pszFilename);
 };
 

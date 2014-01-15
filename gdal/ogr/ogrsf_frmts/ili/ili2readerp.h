@@ -125,7 +125,6 @@ private:
     void     CleanupParser();
     
     char    *m_pszFilename;
-
     
     std::list<std::string> m_missAttrs;
 

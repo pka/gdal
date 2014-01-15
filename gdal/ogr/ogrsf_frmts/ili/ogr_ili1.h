@@ -61,11 +61,8 @@ private:
     OGRILI1DataSource   *poDS;
 
   public:
-                        OGRILI1Layer( const char * pszName,
-                                     OGRSpatialReference *poSRS,
-                                     int bWriter,
-                                     OGRwkbGeometryType eType,
-                                     OGRILI1DataSource *poDS );
+                        OGRILI1Layer( OGRFeatureDefn* poFeatureDefn,
+                                      OGRILI1DataSource *poDS );
 
                        ~OGRILI1Layer();
 

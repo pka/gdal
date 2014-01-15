@@ -302,7 +302,9 @@ OGRILI1DataSource::CreateLayer( const char * pszLayerName,
     }
     VSIFPrintf( fpTransfer, "TABL %s\n", table );
 
-    OGRILI1Layer *poLayer = new OGRILI1Layer(table, poSRS, TRUE, eType, this);
+    OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(table);
+    poFeatureDefn->SetGeomType( eType );
+    OGRILI1Layer *poLayer = new OGRILI1Layer(poFeatureDefn, this);
 
     nLayers ++;
     papoLayers = (OGRILI1Layer**)CPLRealloc(papoLayers, sizeof(OGRILI1Layer*) * nLayers);

@@ -32,7 +32,7 @@
 
 #include "ili1reader.h"
 #include "ogr_ili1.h"
-#include "iom/iom.h"
+#include "imdreader.h"
 
 
 class ILI1Reader;
@@ -46,6 +46,7 @@ class ILI1Reader : public IILI1Reader
 {
 private:
     FILE         *fpItf;
+    ImdReader    *m_imdReader;
     int          nLayers;
     OGRILI1Layer **papoLayers;
     OGRILI1Layer *curLayer;
