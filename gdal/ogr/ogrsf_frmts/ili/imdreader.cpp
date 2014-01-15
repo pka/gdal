@@ -228,6 +228,9 @@ public:
 
 
 ImdReader::ImdReader(int iliVersionIn) : iliVersion(iliVersionIn) {
+  codeBlank = '_';
+  codeUndefined = '@';
+  codeContinue = '\\';
 }
 
 ImdReader::~ImdReader() {
@@ -275,6 +278,7 @@ FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
     {
         modelName = CPLGetXMLValue( psModel, "BID", NULL );
         //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Model: '%s'", modelName);
+
         CPLXMLNode* psEntry = psModel->psChild;
         while( psEntry != NULL )
         {
@@ -284,8 +288,22 @@ FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
                 const char* psTID = CPLGetXMLValue( psEntry, "TID", NULL );
                 if( psTID != NULL )
                     oTidLookup[psTID] = psEntry;
-                //const char* psName = CPLGetXMLValue( psEntry, "Name", NULL );
-                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Class") && !EQUAL(modelName, "MODEL.INTERLIS"))
+
+
+                if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Model") && !EQUAL(modelName, "MODEL.INTERLIS"))
+                {
+                    //version = CPLGetXMLValue(psEntry, "iliVersion", "0"); //1 or 2.3
+
+                    CPLXMLNode *psFormatNode = CPLGetXMLNode( psEntry, "ili1Format" );
+                    if (psFormatNode != NULL)
+                    {
+                        psFormatNode = psFormatNode->psChild;
+                        codeBlank = atoi(CPLGetXMLValue(psFormatNode, "blankCode", "95"));
+                        codeUndefined = atoi(CPLGetXMLValue(psFormatNode, "undefinedCode", "64"));
+                        codeContinue = atoi(CPLGetXMLValue(psFormatNode, "continueCode", "92"));
+                    }
+                }
+                else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Class") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
                     //CPLDebug( "ImdReader::ReadModel   OGR_ILI", "Class Name: '%s'", psTID);
                     OGRFeatureDefn* poTableDefn = new OGRFeatureDefn(LayerName(psTID));

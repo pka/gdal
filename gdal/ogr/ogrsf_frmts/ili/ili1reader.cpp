@@ -65,9 +65,6 @@ ILI1Reader::ILI1Reader() {
   papoLayers = NULL;
   curLayer = NULL;
   metaLayer = NULL;
-  codeBlank = '_';
-  codeUndefined = '@';
-  codeContinue = '\\';
   SetArcDegrees(1);
 }
 
@@ -159,15 +156,9 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
               }
           }
 */
-/*      } else if (EQUAL(tag,"iom04.metamodel.Ili1Format")) {
-        codeBlank = atoi(iom_getattrvalue(modelele, "blankCode"));
-        CPLDebug( "OGR_ILI", "Reading Ili1Format blankCode '%c'", codeBlank );
-        codeUndefined = atoi(iom_getattrvalue(modelele, "undefinedCode"));
-        CPLDebug( "OGR_ILI", "Reading Ili1Format undefinedCode '%c'", codeUndefined );
-        codeContinue = atoi(iom_getattrvalue(modelele, "continueCode"));
-        CPLDebug( "OGR_ILI", "Reading Ili1Format continueCode '%c'", codeContinue );
-      }
-*/
+  CPLDebug( "OGR_ILI", "Ili1Format blankCode '%c'", m_imdReader->codeBlank );
+  CPLDebug( "OGR_ILI", "Ili1Format undefinedCode '%c'", m_imdReader->codeUndefined );
+  CPLDebug( "OGR_ILI", "Ili1Format continueCode '%c'", m_imdReader->codeContinue );
   return 0;
 }
 
@@ -214,12 +205,13 @@ int ILI1Reader::ReadFeatures() {
       }
       else if (EQUAL(firsttok, "TABL"))
       {
-        CPLDebug( "OGR_ILI", "Reading table '%s'", GetLayerNameString(topic, CSLGetField(tokens, 1)) );
         const char *layername = GetLayerNameString(topic, CSLGetField(tokens, 1));
+        CPLDebug( "OGR_ILI", "Reading table '%s'", layername );
         curLayer = GetLayerByName(layername);
 
         if (curLayer == NULL) { //create one
-          CPLDebug( "OGR_ILI", "No model found, using default field names." );
+          CPLError(CE_Warning, CPLE_AppDefined,
+              "No model definition for table '%s' found, using default field names.", layername );
           OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(GetLayerNameString(topic, CSLGetField(tokens, 1)));
           poFeatureDefn->SetGeomType( wkbUnknown );
           curLayer = new OGRILI1Layer(poFeatureDefn, NULL);
@@ -246,7 +238,7 @@ int ILI1Reader::ReadFeatures() {
       }
       else
       {
-        CPLDebug( "OGR_ILI", "Unexpected token: %s", firsttok );
+        CPLError(CE_Warning, CPLE_AppDefined, "Unexpected token: %s", firsttok );
       }
 
       CSLDestroy(tokens);
@@ -336,14 +328,14 @@ int ILI1Reader::ReadTable(const char *layername) {
           int fieldno = 0;
           for (fIndex=1; fIndex<CSLCount(tokens) && fieldno < featureDef->GetFieldCount(); fIndex++, fieldno++)
           {
-            if (!(tokens[fIndex][0] == codeUndefined && tokens[fIndex][1] == '\0')) {
+            if (!(tokens[fIndex][0] == m_imdReader->codeUndefined && tokens[fIndex][1] == '\0')) {
               //CPLDebug( "READ TABLE OGR_ILI", "Setting Field %d (Type %d): %s", fieldno, featureDef->GetFieldDefn(fieldno)->GetType(), tokens[fIndex]);
               if (featureDef->GetFieldDefn(fieldno)->GetType() == OFTString) {
                   //Interlis 1 encoding is ISO 8859-1 (Latin1) -> Recode to UTF-8
                   char* pszRecoded = CPLRecode(tokens[fIndex], CPL_ENC_ISO8859_1, CPL_ENC_UTF8);
                   //Replace space marks
                   for(char* pszString = pszRecoded; *pszString != '\0'; pszString++ ) {
-                      if (*pszString == codeBlank) *pszString = ' ';
+                      if (*pszString == m_imdReader->codeBlank) *pszString = ' ';
                   }
                   feature->SetField(fieldno, pszRecoded);
                   CPLFree(pszRecoded);
@@ -432,7 +424,7 @@ int ILI1Reader::ReadTable(const char *layername) {
       }
       else
       {
-        CPLDebug( "OGR_ILI", "Unexpected token: %s", firsttok );
+        CPLError(CE_Warning, CPLE_AppDefined, "Unexpected token: %s", firsttok );
       }
 
       CSLDestroy(tokens);
@@ -545,7 +537,7 @@ void ILI1Reader::ReadGeom(char **stgeom, int geomIdx, OGRwkbGeometryType eType, 
       }
       else
       {
-        CPLDebug( "OGR_ILI", "Unexpected token: %s", firsttok );
+        CPLError(CE_Warning, CPLE_AppDefined, "Unexpected token: %s", firsttok );
       }
 
       CSLDestroy(tokens);
@@ -628,7 +620,7 @@ char ** ILI1Reader::ReadParseLine()
     token = tokens[CSLCount(tokens)-1];
 
     //Append CONT lines
-    while (strlen(pszLine) && token[0] == codeContinue && token[1] == '\0')
+    while (strlen(pszLine) && token[0] == m_imdReader->codeContinue && token[1] == '\0')
     {
        //remove last token
       CPLFree(tokens[CSLCount(tokens)-1]);

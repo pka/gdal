@@ -40,7 +40,11 @@ typedef std::list<OGRFeatureDefn*> FeatureDefnList;
 
 class ImdReader
 {
+public:
     int                  iliVersion; /* 1 or 2 */
+    char                 codeBlank;
+    char                 codeUndefined;
+    char                 codeContinue;
 public:
                          ImdReader(int iliVersion);
                         ~ImdReader();
