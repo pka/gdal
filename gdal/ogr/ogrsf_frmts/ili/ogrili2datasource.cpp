@@ -32,7 +32,6 @@
 #include "cpl_string.h"
 
 #include "ili2reader.h"
-#include "iomhelper.h"
 
 using namespace std;
 
@@ -49,7 +48,6 @@ OGRILI2DataSource::OGRILI2DataSource()
     pszName = NULL;
     poReader = NULL;
     fpTransfer = NULL;
-    basket = NULL;
     nLayers = 0;
     papoLayers = NULL;
 }
@@ -69,7 +67,7 @@ OGRILI2DataSource::~OGRILI2DataSource()
     }
     CPLFree( papoLayers );
 
-    if (basket) iom_releasebasket(basket);
+/*    if (basket) iom_releasebasket(basket);
     if (fpTransfer)
     {  
       // write file
@@ -80,7 +78,7 @@ OGRILI2DataSource::~OGRILI2DataSource()
   
       iom_end();
   
-    }
+    }*/
     DestroyILI2Reader( poReader );
     CPLFree( pszName );
 }
@@ -203,62 +201,34 @@ int OGRILI2DataSource::Create( const char *pszFilename,
         return FALSE;
     }
 
-    iom_init();
+/* -------------------------------------------------------------------- */
+/*      Create the empty file.                                          */
+/* -------------------------------------------------------------------- */
+    fpTransfer = VSIFOpen( pszName, "w+b" );
 
-    // set error listener to a iom provided one, that just 
-    // dumps all errors to stderr
-    iom_seterrlistener(iom_stderrlistener);
+    if( fpTransfer == NULL )
+    {
+        CPLError( CE_Failure, CPLE_OpenFailed,
+                  "Failed to create %s:\n%s",
+                  pszName, VSIStrerror( errno ) );
 
-    // compile ili model
-    char *iliFiles[1] = {(char *)pszModelFilename};
-    IOM_BASKET model=iom_compileIli(1,iliFiles);
-    if(!model){
-        CPLError( CE_Warning, CPLE_OpenFailed, 
-                    "iom_compileIli %s, %s.", 
-                    pszName, VSIStrerror( errno ) );
-                iom_end();
-        CSLDestroy(filenames);
         return FALSE;
     }
 
-    // open new file
-    fpTransfer=iom_open(pszName,IOM_CREATE | IOM_DONTREAD,0);
-    if(!fpTransfer){
-        CPLError( CE_Warning, CPLE_OpenFailed, 
-                    "Failed to open %s.", 
-                    pszName );
-        CSLDestroy(filenames);
-        return FALSE;
-    }
 
-    // set model of new file
-    iom_setmodel(fpTransfer,model);
+/* -------------------------------------------------------------------- */
+/*      Parse model                                                     */
+/* -------------------------------------------------------------------- */
+    ImdReader m_imdReader(2);
+    m_imdReader.ReadModel(pszModelFilename);
 
-    iom_setheadsender(fpTransfer, pszModelFilename);
+    // pszTopic = CPLStrdup(m_imdReader.mainTopicName.c_str());
 
-    iom_setheadcomment(fpTransfer,"Created by OGR");
+/* -------------------------------------------------------------------- */
+/*      Write headers                                                   */
+/* -------------------------------------------------------------------- */
+    VSIFPrintf( fpTransfer, "<xml/>\n" );
 
-    // create new basket
-    static char basketname[512];
-    basketname[0] = '\0';
-    const char* val = GetAttrObjName(model, "iom04.metamodel.DataModel");
-    if (val)
-    {
-      strcat(basketname, val);
-      strcat(basketname, ".");
-      val = GetAttrObjName(model, "iom04.metamodel.Topic");
-      if (val) strcat(basketname, val);
-    }
-    else
-    {
-      strcat(basketname, "Basket");
-    }
-
-    CSLDestroy(filenames);
-
-    basket=iom_newbasket(fpTransfer);
-    iom_setbaskettag(basket, basketname);
-    iom_setbasketoid(basket, "0");
     return TRUE;
 }
 

@@ -32,7 +32,6 @@
 #include "cpl_string.h"
 
 #include "ilihelper.h"
-#include "iomhelper.h"
 #include "ili2reader.h"
 #include "ili2readerp.h"
 

@@ -34,7 +34,6 @@
 #include "ogr_geos.h"
 
 #include "ilihelper.h"
-#include "iomhelper.h"
 #include "ili1reader.h"
 #include "ili1readerp.h"
 

@@ -36,6 +36,7 @@
 #define INFINITY INFINITY_XERCES
 #endif
 
+#include "imdreader.h"
 #include <list>
 
 

@@ -38,7 +38,6 @@
 
 #include "ili2reader.h"
 #include "ogr_ili2.h"
-#include "imdreader.h"
 
 #include <string>
 #include <set>
@@ -150,8 +149,8 @@ public:
     
     int      AddFeature(DOMElement *elem);
     void     SetFieldValues(OGRFeature *feature, DOMElement* elem);
-    const char* GetLayerName(IOM_BASKET model, IOM_OBJECT table);
-    void     AddField(OGRLayer* layer, IOM_BASKET model, IOM_OBJECT obj);
+    const char* GetLayerName(/*IOM_BASKET model, IOM_OBJECT table*/);
+    void     AddField(OGRLayer* layer/*, IOM_BASKET model, IOM_OBJECT obj*/);
     OGRLineString *getArc(DOMElement *elem);
     OGRGeometry *getGeometry(DOMElement *elem, int type);
     void     setFieldDefn(OGRFeatureDefn *featureDef, DOMElement* elem);

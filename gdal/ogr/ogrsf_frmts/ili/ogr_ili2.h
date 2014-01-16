@@ -32,7 +32,6 @@
 
 #include "ogrsf_frmts.h"
 #include "ili2reader.h"
-#include "iom/iom.h"
 
 #include <string>
 #include <list>
@@ -85,8 +84,7 @@ class OGRILI2DataSource : public OGRDataSource
     
     char        *pszName;
     IILI2Reader *poReader;
-    IOM_FILE    fpTransfer;  //for writing
-    IOM_BASKET  basket;
+    FILE        *fpTransfer; //for writing
 
     int         nLayers;
     OGRILI2Layer** papoLayers;
@@ -99,7 +97,6 @@ class OGRILI2DataSource : public OGRDataSource
     int         Create( const char *pszFile, char **papszOptions );
 
     const char *GetName() { return pszName; }
-    IOM_BASKET  GetBasket() { return basket; }
     int         GetLayerCount() { return listLayer.size(); }
     OGRLayer   *GetLayer( int );
 

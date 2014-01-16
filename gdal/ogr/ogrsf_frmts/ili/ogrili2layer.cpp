@@ -132,8 +132,9 @@ static char* d2str(double val)
     return strbuf;
 }
 
-static void AppendCoordinateList( OGRLineString *poLine, IOM_OBJECT sequence)
+static void AppendCoordinateList( OGRLineString *poLine/*, IOM_OBJECT sequence*/)
 {
+    /*
 	IOM_OBJECT coordValue;
     int         b3D = (poLine->getGeometryType() & wkb25DBit);
 
@@ -145,21 +146,23 @@ static void AppendCoordinateList( OGRLineString *poLine, IOM_OBJECT sequence)
         if (b3D) iom_setattrvalue(coordValue,"C3", d2str(poLine->getZ(iPoint)));
         iom_releaseobject(coordValue);
     }
+    */
 }
 
-static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const char *attrname )
+static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, /*IOM_OBJECT obj,*/ const char *attrname )
 {
+    /*
     IOM_OBJECT polylineValue;
     IOM_OBJECT sequence;
     IOM_OBJECT coordValue;
     IOM_OBJECT multisurface;
     IOM_OBJECT surface;
     IOM_OBJECT boundary;
-
+*/
 /* -------------------------------------------------------------------- */
 /*      2D Point                                                        */
 /* -------------------------------------------------------------------- */
-    if( poGeometry->getGeometryType() == wkbPoint )
+/*    if( poGeometry->getGeometryType() == wkbPoint )
     {
         OGRPoint *poPoint = (OGRPoint *) poGeometry;
 
@@ -168,10 +171,10 @@ static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const
         iom_setattrvalue(coordValue,"C2", d2str(poPoint->getY()));
         iom_releaseobject(coordValue);
     }
-/* -------------------------------------------------------------------- */
+*//* -------------------------------------------------------------------- */
 /*      3D Point                                                        */
 /* -------------------------------------------------------------------- */
-    else if( poGeometry->getGeometryType() == wkbPoint25D )
+/*    else if( poGeometry->getGeometryType() == wkbPoint25D )
     {
         OGRPoint *poPoint = (OGRPoint *) poGeometry;
 
@@ -181,11 +184,11 @@ static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const
         iom_setattrvalue(coordValue,"C3", d2str(poPoint->getZ()));
         iom_releaseobject(coordValue);
     }
-
+*/
 /* -------------------------------------------------------------------- */
 /*      LineString and LinearRing                                       */
 /* -------------------------------------------------------------------- */
-    else if( poGeometry->getGeometryType() == wkbLineString 
+/*    else if( poGeometry->getGeometryType() == wkbLineString 
              || poGeometry->getGeometryType() == wkbLineString25D )
     {
         //int bRing = EQUAL(poGeometry->getGeometryName(),"LINEARRING");
@@ -197,11 +200,11 @@ static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const
         iom_releaseobject(sequence);
         iom_releaseobject(polylineValue);
     }
-
+*/
 /* -------------------------------------------------------------------- */
 /*      Polygon                                                         */
 /* -------------------------------------------------------------------- */
-    else if( poGeometry->getGeometryType() == wkbPolygon 
+/*    else if( poGeometry->getGeometryType() == wkbPolygon 
              || poGeometry->getGeometryType() == wkbPolygon25D )
     {
         OGRPolygon      *poPolygon = (OGRPolygon *) poGeometry;
@@ -227,11 +230,11 @@ static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const
         iom_releaseobject(surface);
         iom_releaseobject(multisurface);
     }
-
+*/
 /* -------------------------------------------------------------------- */
 /*      MultiPolygon                                                    */
 /* -------------------------------------------------------------------- */
-    else if( wkbFlatten(poGeometry->getGeometryType()) == wkbMultiPolygon 
+/*    else if( wkbFlatten(poGeometry->getGeometryType()) == wkbMultiPolygon 
              || wkbFlatten(poGeometry->getGeometryType()) == wkbMultiLineString
              || wkbFlatten(poGeometry->getGeometryType()) == wkbMultiPoint
              || wkbFlatten(poGeometry->getGeometryType()) == wkbGeometryCollection )
@@ -264,7 +267,7 @@ static int OGR2ILIGeometryAppend( OGRGeometry *poGeometry, IOM_OBJECT obj, const
 
     else
         return FALSE;
-
+*/
     return TRUE;
 }
 
@@ -287,6 +290,7 @@ OGRErr OGRILI2Layer::CreateFeature( OGRFeature *poFeature ) {
         tid = szTempBuffer;
     }
     // create new object
+    /*
     IOM_OBJECT obj;
     obj=iom_newobject(poDS->GetBasket(), poFeatureDefn->GetName(), tid);
 
@@ -316,6 +320,7 @@ OGRErr OGRILI2Layer::CreateFeature( OGRFeature *poFeature ) {
     }
 
     iom_releaseobject(obj);
+    */
     return OGRERR_NONE;
 }
 

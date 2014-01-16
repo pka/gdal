@@ -649,7 +649,7 @@ def ogr_interlis2_2():
 
 
 ###############################################################################
-# Write Ili2 transfer file without model.
+# Write Ili2 transfer file.
 
 def ogr_interlis2_3():
 
@@ -662,34 +662,7 @@ def ogr_interlis2_3():
     feat = lyr.GetNextFeature()
 
     driver = ogr.GetDriverByName( 'Interlis 2' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis2_3.xtf' )
-
-    dst_lyr = dst_ds.CreateLayer( 'RoadsExdm2ien.RoadsExtended.RoadSign' )
-
-    layer_defn = lyr.GetLayerDefn()
-    for i in range( layer_defn.GetFieldCount() ):
-        dst_lyr.CreateField( layer_defn.GetFieldDefn( i ) )
-    dst_feat = ogr.Feature( feature_def = dst_lyr.GetLayerDefn() )
-    dst_feat.SetFrom( feat )
-    dst_lyr.CreateFeature( dst_feat )
-
-    return 'success'
-
-###############################################################################
-# Write Ili2 transfer file.
-
-def ogr_interlis2_4():
-
-    if not gdaltest.have_ili_reader:
-        return 'skip'
-
-    ds = ogr.Open('data/ili/RoadsExdm2ien.xml,data/ili/RoadsExdm2ien.imd')
-
-    lyr = ds.GetLayerByName('RoadsExdm2ien.RoadsExtended.RoadSign')
-    feat = lyr.GetNextFeature()
-
-    driver = ogr.GetDriverByName( 'Interlis 2' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis2_4.xtf,data/ili/RoadsExdm2ben.ili,data/ili/RoadsExdm2ien.ili' )
+    dst_ds = driver.CreateDataSource( 'tmp/interlis2_3.xtf,data/ili/RoadsExdm2ien.imd' )
 
     dst_lyr = dst_ds.CreateLayer( 'RoadsExdm2ien.RoadsExtended.RoadSign' )
 
@@ -847,8 +820,7 @@ gdaltest_list = [
     ogr_interlis1_13,
     ogr_interlis2_1,
     ogr_interlis2_2,
-    # ogr_interlis2_3,
-    # ogr_interlis2_4,
+    ogr_interlis2_3,
     ogr_interlis_arc1,
     ogr_interlis_cleanup ]
 
