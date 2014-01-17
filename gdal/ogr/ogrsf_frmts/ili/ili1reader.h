@@ -39,7 +39,7 @@ public:
 
     virtual int  OpenFile( const char *pszFilename ) = 0;
     
-    virtual int  ReadModel( const char *pszModelFilename ) = 0;
+    virtual int  ReadModel( ImdReader *poImdReader, const char *pszModelFilename ) = 0;
     virtual int  ReadFeatures() = 0;       
     
     virtual OGRLayer *GetLayer( int ) = 0;

@@ -373,8 +373,8 @@ OGRGeometry *ILI2Reader::getGeometry(DOMElement *elem, int type) {
   return gm;
 }
 
-int ILI2Reader::ReadModel(char **modelFilenames) {
-  std::list<OGRFeatureDefn*> poTableList = m_imdReader->ReadModel(modelFilenames[0]);
+int ILI2Reader::ReadModel(ImdReader *poImdReader, char *modelFilename) {
+  std::list<OGRFeatureDefn*> poTableList = poImdReader->ReadModel(modelFilename);
   for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
   {
     OGRLayer* layer = new OGRILI2Layer(*it, NULL);
@@ -465,13 +465,11 @@ ILI2Reader::ILI2Reader() {
     m_bReadStarted = FALSE;
 
     m_pszFilename = NULL;
-    m_imdReader = new ImdReader(2);
 
     SetupParser();
 }
 
 ILI2Reader::~ILI2Reader() {
-    delete m_imdReader;
     CPLFree( m_pszFilename );
 
     CleanupParser();

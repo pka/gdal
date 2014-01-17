@@ -59,11 +59,13 @@ IILI1Reader::~IILI1Reader() {
 
 ILI1Reader::ILI1Reader() {
   fpItf = NULL;
-  m_imdReader = new ImdReader(1);
   nLayers = 0;
   papoLayers = NULL;
   curLayer = NULL;
   metaLayer = NULL;
+  codeBlank = '_';
+  codeUndefined = '@';
+  codeContinue = '\\';
   SetArcDegrees(1);
 }
 
@@ -74,7 +76,6 @@ ILI1Reader::~ILI1Reader() {
   for(i=0;i<nLayers;i++)
      delete papoLayers[i];
   CPLFree(papoLayers);
-  delete m_imdReader;
 
   delete metaLayer;
 }
@@ -104,9 +105,9 @@ const char* ILI1Reader::GetLayerNameString(const char* topicname, const char* ta
     return CPLSPrintf("%s__%s", topicname, tablename);
 }
 
-int ILI1Reader::ReadModel(const char *pszModelFilename) {
+int ILI1Reader::ReadModel(ImdReader *poImdReader, const char *pszModelFilename) {
 
-  std::list<OGRFeatureDefn*> poTableList = m_imdReader->ReadModel(pszModelFilename);
+  std::list<OGRFeatureDefn*> poTableList = poImdReader->ReadModel(pszModelFilename);
   for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
   {
     OGRILI1Layer* layer = new OGRILI1Layer(*it, NULL);
@@ -155,9 +156,12 @@ int ILI1Reader::ReadModel(const char *pszModelFilename) {
               }
           }
 */
-  CPLDebug( "OGR_ILI", "Ili1Format blankCode '%c'", m_imdReader->codeBlank );
-  CPLDebug( "OGR_ILI", "Ili1Format undefinedCode '%c'", m_imdReader->codeUndefined );
-  CPLDebug( "OGR_ILI", "Ili1Format continueCode '%c'", m_imdReader->codeContinue );
+  codeBlank = poImdReader->codeBlank;
+  CPLDebug( "OGR_ILI", "Ili1Format blankCode '%c'", poImdReader->codeBlank );
+  codeUndefined = poImdReader->codeUndefined;
+  CPLDebug( "OGR_ILI", "Ili1Format undefinedCode '%c'", poImdReader->codeUndefined );
+  codeContinue = poImdReader->codeContinue;
+  CPLDebug( "OGR_ILI", "Ili1Format continueCode '%c'", poImdReader->codeContinue );
   return 0;
 }
 
@@ -327,14 +331,14 @@ int ILI1Reader::ReadTable(const char *layername) {
           int fieldno = 0;
           for (fIndex=1; fIndex<CSLCount(tokens) && fieldno < featureDef->GetFieldCount(); fIndex++, fieldno++)
           {
-            if (!(tokens[fIndex][0] == m_imdReader->codeUndefined && tokens[fIndex][1] == '\0')) {
+            if (!(tokens[fIndex][0] == codeUndefined && tokens[fIndex][1] == '\0')) {
               //CPLDebug( "READ TABLE OGR_ILI", "Setting Field %d (Type %d): %s", fieldno, featureDef->GetFieldDefn(fieldno)->GetType(), tokens[fIndex]);
               if (featureDef->GetFieldDefn(fieldno)->GetType() == OFTString) {
                   //Interlis 1 encoding is ISO 8859-1 (Latin1) -> Recode to UTF-8
                   char* pszRecoded = CPLRecode(tokens[fIndex], CPL_ENC_ISO8859_1, CPL_ENC_UTF8);
                   //Replace space marks
                   for(char* pszString = pszRecoded; *pszString != '\0'; pszString++ ) {
-                      if (*pszString == m_imdReader->codeBlank) *pszString = ' ';
+                      if (*pszString == codeBlank) *pszString = ' ';
                   }
                   feature->SetField(fieldno, pszRecoded);
                   CPLFree(pszRecoded);
@@ -619,7 +623,7 @@ char ** ILI1Reader::ReadParseLine()
     token = tokens[CSLCount(tokens)-1];
 
     //Append CONT lines
-    while (strlen(pszLine) && token[0] == m_imdReader->codeContinue && token[1] == '\0')
+    while (strlen(pszLine) && token[0] == codeContinue && token[1] == '\0')
     {
        //remove last token
       CPLFree(tokens[CSLCount(tokens)-1]);

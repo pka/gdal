@@ -673,6 +673,18 @@ def ogr_interlis2_3():
     dst_feat.SetFrom( feat )
     dst_lyr.CreateFeature( dst_feat )
 
+    lyr = ds.GetLayerByName('RoadsExdm2ben.Roads.LandCover')
+    feat = lyr.GetNextFeature()
+
+    dst_lyr = dst_ds.CreateLayer( 'RoadsExdm2ben.Roads.LandCover' )
+
+    layer_defn = lyr.GetLayerDefn()
+    for i in range( layer_defn.GetFieldCount() ):
+        dst_lyr.CreateField( layer_defn.GetFieldDefn( i ) )
+    dst_feat = ogr.Feature( feature_def = dst_lyr.GetLayerDefn() )
+    dst_feat.SetFrom( feat )
+    dst_lyr.CreateFeature( dst_feat )
+
     return 'success'
 
 ###############################################################################

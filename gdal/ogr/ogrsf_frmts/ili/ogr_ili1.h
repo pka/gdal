@@ -101,6 +101,7 @@ class OGRILI1DataSource : public OGRDataSource
 {
   private:
     char       *pszName;
+    ImdReader  *poImdReader;
     IILI1Reader *poReader;
     FILE       *fpTransfer;
     char       *pszTopic;

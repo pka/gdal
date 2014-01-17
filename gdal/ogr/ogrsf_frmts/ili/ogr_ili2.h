@@ -31,6 +31,7 @@
 #define _OGR_ILI2_H_INCLUDED
 
 #include "ogrsf_frmts.h"
+#include "imdreader.h"
 #include "ili2reader.h"
 
 #include <string>
@@ -81,10 +82,12 @@ class OGRILI2DataSource : public OGRDataSource
 {
   private:
     std::list<OGRLayer *> listLayer;
+    std::list<OGRFeatureDefn*> listModelLayerDefs;
     
     char        *pszName;
+    ImdReader   *poImdReader;
     IILI2Reader *poReader;
-    FILE        *fpTransfer; //for writing
+    VSILFILE    *fpOutput;
 
     int         nLayers;
     OGRILI2Layer** papoLayers;
@@ -105,6 +108,7 @@ class OGRILI2DataSource : public OGRDataSource
                                       OGRwkbGeometryType = wkbUnknown,
                                       char ** = NULL );
 
+    VSILFILE *  GetOutputFP() { return fpOutput; }
     int         TestCapability( const char * );
 };
 

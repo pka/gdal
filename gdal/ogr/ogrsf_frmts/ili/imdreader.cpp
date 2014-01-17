@@ -102,14 +102,14 @@ public:
     {
         OGRFieldDefn fieldDef(psName, fieldType);
         poTableDefn->AddFieldDefn(&fieldDef);
-        CPLDebug( "OGR_ILI", "Adding field %s to Class %s", psName, poTableDefn->GetName());                
+        CPLDebug( "OGR_ILI", "Adding field '%s' to Class %s", psName, poTableDefn->GetName());                
     }
     void AddGeomField(const char* psName, OGRwkbGeometryType geomType)
     {
         OGRGeomFieldDefn fieldDef(psName, geomType);
         //oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
         poTableDefn->AddGeomFieldDefn(&fieldDef);
-        CPLDebug( "OGR_ILI", "Adding geometry field %s to Class %s", psName, poTableDefn->GetName());                
+        CPLDebug( "OGR_ILI", "Adding geometry field '%s' to Class %s", psName, poTableDefn->GetName());                
     }
     void AddCoord(int iliVersion, const char* psName, CPLXMLNode* psTypeNode, NodeCountMap& oAxisCount)
     {
@@ -190,7 +190,7 @@ public:
                             AddGeomTable(geomLayerName, psName, wkbPolygon);
                             //layer->SetSurfacePolyLayer(polyLayer, layer->GetLayerDefn()->GetGeomFieldCount()-1);
                         } else {
-                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s to Class %s", psKind, poTableDefn->GetName());                
+                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s as wkbMultiLineString", psKind);
                             AddGeomField(psName, wkbMultiLineString);
                         }
                     } else {
@@ -198,7 +198,7 @@ public:
                         {
                             AddGeomField(psName, wkbPolygon);
                         } else {
-                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s to Class %s", psKind, poTableDefn->GetName());                
+                            CPLDebug( "OGR_ILI", "Adding geometry field of kind %s as wkbMultiLineString", psKind);
                             AddGeomField(psName, wkbMultiLineString);
                         }
                     }
@@ -308,6 +308,7 @@ FeatureDefnList ImdReader::ReadModel(const char *pszFilename) {
                 }
                 else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.SubModel") && !EQUAL(modelName, "MODEL.INTERLIS"))
                 {
+                    mainBasketName = CPLGetXMLValue(psEntry, "TID", "OGR");
                     mainTopicName = CPLGetXMLValue(psEntry, "Name", "OGR");
                 }
                 else if( EQUAL(psEntry->pszValue, "IlisMeta07.ModelData.Class") && !EQUAL(modelName, "MODEL.INTERLIS"))

@@ -43,6 +43,7 @@ class ImdReader
 public:
     int                  iliVersion; /* 1 or 2 */
     CPLString            mainModelName;
+    CPLString            mainBasketName;
     CPLString            mainTopicName;
     char                 codeBlank;
     char                 codeUndefined;

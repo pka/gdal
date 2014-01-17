@@ -45,12 +45,14 @@ class ILI1Reader : public IILI1Reader
 {
 private:
     FILE         *fpItf;
-    ImdReader    *m_imdReader;
     int          nLayers;
     OGRILI1Layer **papoLayers;
     OGRILI1Layer *curLayer;
     OGRILI1Layer *metaLayer;
     double       arcIncr;
+    char         codeBlank;
+    char         codeUndefined;
+    char         codeContinue;
 
 public:
                  ILI1Reader();
@@ -58,7 +60,7 @@ public:
 
     void         SetArcDegrees(double arcDegrees);
     int          OpenFile( const char *pszFilename );
-    int          ReadModel( const char *pszModelFilename );
+    int          ReadModel( ImdReader *poImdReader, const char *pszModelFilename );
     int          ReadFeatures();
     int          ReadTable(const char *layername);
     void         ReadGeom(char **stgeom, int geomIdx, OGRwkbGeometryType eType, OGRFeature *feature);

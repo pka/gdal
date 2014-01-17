@@ -127,7 +127,6 @@ private:
     
     std::list<std::string> m_missAttrs;
 
-    ImdReader *m_imdReader;
     ILI2Handler *m_poILI2Handler;
     SAX2XMLReader *m_poSAXReader;
     int      m_bReadStarted;
@@ -141,7 +140,7 @@ public:
 
     void     SetArcDegrees(double arcDegrees);
     void     SetSourceFile( const char *pszFilename );
-    int      ReadModel( char **modelFilenames );
+    int      ReadModel( ImdReader *poImdReader, char *modelFilename );
     int      SaveClasses( const char *pszFile );
     
     std::list<OGRLayer *> GetLayers();

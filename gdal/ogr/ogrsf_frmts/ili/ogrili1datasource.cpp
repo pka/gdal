@@ -45,6 +45,7 @@ OGRILI1DataSource::OGRILI1DataSource()
 
 {
     pszName = NULL;
+    poImdReader = new ImdReader(1);
     poReader = NULL;
     fpTransfer = NULL;
     pszTopic = NULL;
@@ -70,6 +71,7 @@ OGRILI1DataSource::~OGRILI1DataSource()
     CPLFree( pszName );
     CPLFree( pszTopic );
     DestroyILI1Reader( poReader );
+    delete poImdReader;
     if( fpTransfer )
     {
         VSIFPrintf( fpTransfer, "ETAB\n" );
@@ -160,7 +162,7 @@ int OGRILI1DataSource::Open( const char * pszNewName, int bTestOpen )
     pszName = CPLStrdup( osBasename.c_str() );
 
     if (osModelFilename.length() > 0 )
-        poReader->ReadModel( osModelFilename.c_str() );
+        poReader->ReadModel( poImdReader, osModelFilename.c_str() );
 
     if( getenv( "ARC_DEGREES" ) != NULL ) {
       //No better way to pass arguments to the reader (it could even be an -lco arg)
