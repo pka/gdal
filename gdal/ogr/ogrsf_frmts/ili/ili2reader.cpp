@@ -374,10 +374,10 @@ OGRGeometry *ILI2Reader::getGeometry(DOMElement *elem, int type) {
 }
 
 int ILI2Reader::ReadModel(ImdReader *poImdReader, char *modelFilename) {
-  std::list<OGRFeatureDefn*> poTableList = poImdReader->ReadModel(modelFilename);
-  for (std::list<OGRFeatureDefn*>::const_iterator it = poTableList.begin(); it != poTableList.end(); ++it)
+  poImdReader->ReadModel(modelFilename);
+  for (FeatureDefnInfos::const_iterator it = poImdReader->featureDefnInfos.begin(); it != poImdReader->featureDefnInfos.end(); ++it)
   {
-    OGRLayer* layer = new OGRILI2Layer(*it, NULL);
+    OGRLayer* layer = new OGRILI2Layer(it->first, it->second, NULL);
     m_listLayer.push_back(layer);
   }
   return 0;
@@ -639,7 +639,8 @@ int ILI2Reader::AddFeature(DOMElement *elem) {
     CPLDebug( "OGR_ILI", "Adding layer: %s", pszName );
     OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(pszName);
     poFeatureDefn->SetGeomType( wkbUnknown );
-    curLayer = new OGRILI2Layer(poFeatureDefn, NULL);
+    GeomFieldInfos oGeomFieldInfos;
+    curLayer = new OGRILI2Layer(poFeatureDefn, oGeomFieldInfos, NULL);
     m_listLayer.push_back(curLayer);
   }
 
