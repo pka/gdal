@@ -126,6 +126,14 @@ public:
         OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
         AddGeomField(psName, geomType);
     }
+    OGRFieldType GetFormattedType(CPLXMLNode* node, StrNodeMap& oTidLookup)
+    {
+        const char* psRefSuper = CPLGetXMLValue( node, "Super.REF", NULL );
+        if (psRefSuper)
+            return GetFormattedType(oTidLookup[psRefSuper], oTidLookup);
+        else
+            return OFTString; //TODO: Time, Date, etc. if possible
+    }
     void AddFieldDefinitions(int iliVersion, StrNodeMap& oTidLookup, NodeCountMap& oAxisCount)
     {
         // Delete default geometry field
@@ -160,6 +168,14 @@ public:
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.NumType"))
                 { //// Unit INTERLIS.ANYUNIT, INTERLIS.TIME, INTERLIS.h, INTERLIS.min, INTERLIS.s, INTERLIS.M, INTERLIS.d
                     AddField(psName, OFTReal);
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.BlackboxType"))
+                {
+                    AddField(psName, OFTString);
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.FormattedType"))
+                {
+                    AddField(psName, GetFormattedType(*it, oTidLookup));
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.CoordType"))
                 {
@@ -283,7 +299,7 @@ void ImdReader::ReadModel(const char *pszFilename) {
 
         CPLXMLNode* psEntry = psModel->psChild;
         while( psEntry != NULL )
-        {
+                {
             if (psEntry->eType != CXT_Attribute) //ignore BID
             {
                 //CPLDebug( "OGR_ILI", "Node tag: '%s'", psEntry->pszValue);
