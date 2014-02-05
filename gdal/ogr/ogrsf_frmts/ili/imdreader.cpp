@@ -42,17 +42,26 @@ CPL_CVSID("$Id$");
 typedef std::map<CPLString,CPLXMLNode*> StrNodeMap;
 typedef std::vector<CPLXMLNode*> NodeVector;
 typedef std::map<CPLXMLNode*,int> NodeCountMap;
+class IliClass;
+typedef std::map<CPLXMLNode*,IliClass*> ClassesMap; /* all classes with XML node for lookup */
 
+/* Helper class for collection class infos */
 class IliClass
 {
 public:
+    int iliVersion;
     OGRFeatureDefn* poTableDefn;
+    StrNodeMap& oTidLookup;
+    ClassesMap& oClasses;
+    NodeCountMap& oAxisCount;
     GeomFieldInfos  poGeomFieldInfos;
     NodeVector oFields;
     bool isAssocClass;
     bool hasDerivedClasses;
 
-    IliClass(OGRFeatureDefn* poTableDefnIn) : poTableDefn(poTableDefnIn), poGeomFieldInfos(), oFields(), isAssocClass(false), hasDerivedClasses(false)
+    IliClass(int iliVersion_, OGRFeatureDefn* poTableDefnIn, StrNodeMap& oTidLookup_, ClassesMap& oClasses_, NodeCountMap& oAxisCount_) :
+        iliVersion(iliVersion_), poTableDefn(poTableDefnIn), oTidLookup(oTidLookup_), oClasses(oClasses_), oAxisCount(oAxisCount_),
+        poGeomFieldInfos(), oFields(), isAssocClass(false), hasDerivedClasses(false)
     {
     };
     ~IliClass()
@@ -103,16 +112,16 @@ public:
     {
         OGRFieldDefn fieldDef(psName, fieldType);
         poTableDefn->AddFieldDefn(&fieldDef);
-        CPLDebug( "OGR_ILI", "Adding field '%s' to Class %s", psName, poTableDefn->GetName());                
+        CPLDebug( "OGR_ILI", "Adding field '%s' to Class %s", psName, poTableDefn->GetName());
     }
     void AddGeomField(const char* psName, OGRwkbGeometryType geomType)
     {
         OGRGeomFieldDefn fieldDef(psName, geomType);
         //oGFld.SetSpatialRef(geomlayer->GetSpatialRef());
         poTableDefn->AddGeomFieldDefn(&fieldDef);
-        CPLDebug( "OGR_ILI", "Adding geometry field '%s' to Class %s", psName, poTableDefn->GetName());                
+        CPLDebug( "OGR_ILI", "Adding geometry field '%s' to Class %s", psName, poTableDefn->GetName());
     }
-    void AddCoord(int iliVersion, const char* psName, CPLXMLNode* psTypeNode, NodeCountMap& oAxisCount)
+    void AddCoord(const char* psName, CPLXMLNode* psTypeNode)
     {
         int dim = oAxisCount[psTypeNode];
         if (dim == 0) dim = 2; //Area center points have no Axis spec
@@ -126,15 +135,15 @@ public:
         OGRwkbGeometryType geomType = (dim > 2) ? wkbPoint25D : wkbPoint;
         AddGeomField(psName, geomType);
     }
-    OGRFieldType GetFormattedType(CPLXMLNode* node, StrNodeMap& oTidLookup)
+    OGRFieldType GetFormattedType(CPLXMLNode* node)
     {
         const char* psRefSuper = CPLGetXMLValue( node, "Super.REF", NULL );
         if (psRefSuper)
-            return GetFormattedType(oTidLookup[psRefSuper], oTidLookup);
+            return GetFormattedType(oTidLookup[psRefSuper]);
         else
             return OFTString; //TODO: Time, Date, etc. if possible
     }
-    void AddFieldDefinitions(int iliVersion, StrNodeMap& oTidLookup, NodeCountMap& oAxisCount)
+    void InitFieldDefinitions()
     {
         // Delete default geometry field
         poTableDefn->DeleteGeomFieldDefn(0);
@@ -142,7 +151,10 @@ public:
         const char* psTidColName = (iliVersion == 1) ? "_TID" : "TID";
         OGRFieldDefn ofieldDefn(psTidColName, OFTString);
         poTableDefn->AddFieldDefn(&ofieldDefn);
-        for (NodeVector::const_iterator it = oFields.begin(); it != oFields.end(); ++it)
+    }
+    void AddFieldDefinitions(NodeVector fields)
+    {
+        for (NodeVector::const_iterator it = fields.begin(); it != fields.end(); ++it)
         {
             if (*it == NULL) continue;
             const char* psName = CPLGetXMLValue( *it, "Name", NULL );
@@ -175,11 +187,21 @@ public:
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.FormattedType"))
                 {
-                    AddField(psName, GetFormattedType(*it, oTidLookup));
+                    AddField(psName, GetFormattedType(*it));
+                }
+                else if (EQUAL(typeName, "IlisMeta07.ModelData.MultiValue"))
+                {
+                    const char* psClassRef = CPLGetXMLValue( psElementNode, "BaseType.REF", NULL );
+                    if (psClassRef)
+                    {
+                        IliClass* psParentClass = oClasses[oTidLookup[psClassRef]];
+                        CPLDebug( "OGR_ILI", "Adding embedded struct members of MultiValue field '%s' from Class %s", psName, psClassRef);
+                        AddFieldDefinitions(psParentClass->oFields);
+                    }
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.CoordType"))
                 {
-                    AddCoord(iliVersion, psName, psElementNode, oAxisCount);
+                    AddCoord(psName, psElementNode);
                 }
                 else if (EQUAL(typeName, "IlisMeta07.ModelData.LineType"))
                 {
@@ -190,7 +212,7 @@ public:
                         if (EQUAL(psKind, "Area"))
                         {
                             CPLString areaPointGeomName = psName + CPLString("__Point");
-                            AddCoord(iliVersion, areaPointGeomName, psElementNode, oAxisCount);
+                            AddCoord(areaPointGeomName, psElementNode);
 
                             CPLString lineLayerName = poTableDefn->GetName() + CPLString("_") + psName;
                             AddGeomTable(lineLayerName, psName, wkbMultiLineString);
@@ -285,7 +307,6 @@ void ImdReader::ReadModel(const char *pszFilename) {
         return;
 
     StrNodeMap oTidLookup; /* for fast lookup of REF relations */
-    typedef std::map<CPLXMLNode*,IliClass*> ClassesMap; /* all classes with XML node for lookup */
     ClassesMap oClasses;
     NodeCountMap oAxisCount;
     const char *modelName;
@@ -331,7 +352,7 @@ void ImdReader::ReadModel(const char *pszFilename) {
                 {
                     //CPLDebug( "OGR_ILI", "Class Name: '%s'", psTID);
                     OGRFeatureDefn* poTableDefn = new OGRFeatureDefn(LayerName(psTID));
-                    oClasses[psEntry] = new IliClass(poTableDefn);
+                    oClasses[psEntry] = new IliClass(iliVersion, poTableDefn, oTidLookup, oClasses, oAxisCount);
                 }
             }
             psEntry = psEntry->psNext;
@@ -383,7 +404,8 @@ void ImdReader::ReadModel(const char *pszFilename) {
         const char* psRefSuper = CPLGetXMLValue( it->first, "Super.REF", NULL );
         if (psRefSuper)
             oClasses[oTidLookup[psRefSuper]]->hasDerivedClasses = true;
-        it->second->AddFieldDefinitions(iliVersion, oTidLookup, oAxisCount);
+        it->second->InitFieldDefinitions();
+        it->second->AddFieldDefinitions(it->second->oFields);
     }
 
     /* Filter relevant classes */

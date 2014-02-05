@@ -383,12 +383,17 @@ int ILI2Reader::ReadModel(ImdReader *poImdReader, char *modelFilename) {
   return 0;
 }
 
+//Detect field name of value element
 char* fieldName(DOMElement* elem) {
-  int depth = 0;
-  DOMNode *node;
-  for (node = elem; node; node = node->getParentNode()) ++depth;
-  node = elem;
-  for (int d = 0; d<depth-4; ++d) node = node->getParentNode();
+  DOMNode *node = elem;
+  if (getGeometryTypeOfElem(elem))
+  {
+    int depth = 0; // Depth of value elem node
+    for (node = elem; node; node = node->getParentNode()) ++depth;
+    //Field name is on level 4
+    node = elem;
+    for (int d = 0; d<depth-4; ++d) node = node->getParentNode();
+  }
   char* pszNodeName = XMLString::transcode(node->getNodeName());
   char* pszRet = CPLStrdup(pszNodeName);
   XMLString::release(&pszNodeName);
