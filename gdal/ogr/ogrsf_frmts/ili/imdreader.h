@@ -46,7 +46,16 @@ public:
 };
 
 typedef std::map<CPLString,GeomFieldInfo> GeomFieldInfos; /* key: geom field name, value: ILI geom field info */
-typedef std::pair<OGRFeatureDefn*, GeomFieldInfos> FeatureDefnInfo;
+typedef std::map<CPLString,CPLString> StructFieldInfos; /* key: struct field name, value: struct table */
+
+class FeatureDefnInfo
+{
+public:
+    OGRFeatureDefn* poTableDefn;
+    GeomFieldInfos  poGeomFieldInfos;
+    StructFieldInfos poStructFieldInfos;
+};
+
 typedef std::list<FeatureDefnInfo> FeatureDefnInfos;
 
 class ImdReader
@@ -63,7 +72,6 @@ public:
 public:
                          ImdReader(int iliVersion);
                         ~ImdReader();
-    const char*          LayerName(const char* psClassTID);
     void                 ReadModel(const char *pszFilename);
     FeatureDefnInfo      GetFeatureDefnInfo(const char *pszLayerName);
 };

@@ -283,7 +283,7 @@ OGRILI1DataSource::CreateLayer( const char * pszLayerName,
 
     OGRFeatureDefn* poFeatureDefn = new OGRFeatureDefn(table);
     poFeatureDefn->SetGeomType( eType );
-    OGRILI1Layer *poLayer = new OGRILI1Layer(poFeatureDefn, featureDefnInfo.second, this);
+    OGRILI1Layer *poLayer = new OGRILI1Layer(poFeatureDefn, featureDefnInfo.poGeomFieldInfos, this);
 
     nLayers ++;
     papoLayers = (OGRILI1Layer**)CPLRealloc(papoLayers, sizeof(OGRILI1Layer*) * nLayers);

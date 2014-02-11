@@ -107,7 +107,7 @@ int ILI1Reader::ReadModel(ImdReader *poImdReader, const char *pszModelFilename) 
   poImdReader->ReadModel(pszModelFilename);
   for (FeatureDefnInfos::const_iterator it = poImdReader->featureDefnInfos.begin(); it != poImdReader->featureDefnInfos.end(); ++it)
   {
-    OGRILI1Layer* layer = new OGRILI1Layer(it->first, it->second, NULL);
+    OGRILI1Layer* layer = new OGRILI1Layer(it->poTableDefn, it->poGeomFieldInfos, NULL);
     AddLayer(layer);
   }
 

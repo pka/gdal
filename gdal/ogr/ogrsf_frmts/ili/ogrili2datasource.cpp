@@ -264,7 +264,7 @@ OGRILI2DataSource::CreateLayer( const char * pszLayerName,
         return NULL;
 
     FeatureDefnInfo featureDefnInfo = poImdReader->GetFeatureDefnInfo(pszLayerName);
-    OGRFeatureDefn* poFeatureDefn = featureDefnInfo.first;
+    OGRFeatureDefn* poFeatureDefn = featureDefnInfo.poTableDefn;
     if (poFeatureDefn == NULL)
     {
         CPLError(CE_Warning, CPLE_AppDefined,
@@ -272,7 +272,7 @@ OGRILI2DataSource::CreateLayer( const char * pszLayerName,
         poFeatureDefn = new OGRFeatureDefn(pszLayerName);
         poFeatureDefn->SetGeomType( eType );
     }
-    OGRILI2Layer *poLayer = new OGRILI2Layer(poFeatureDefn, featureDefnInfo.second, this);
+    OGRILI2Layer *poLayer = new OGRILI2Layer(poFeatureDefn, featureDefnInfo.poGeomFieldInfos, this);
 
     nLayers++;
     papoLayers = (OGRILI2Layer**)CPLRealloc(papoLayers, sizeof(OGRILI2Layer*) * nLayers);
