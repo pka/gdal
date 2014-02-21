@@ -215,7 +215,8 @@ def ogr_interlis1_5():
     feat = lyr.GetNextFeature()
 
     driver = ogr.GetDriverByName( 'Interlis 1' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis1_5.itf' )
+    outfile = "tmp/interlis1_5.itf"
+    dst_ds = driver.CreateDataSource(outfile)
 
     dst_lyr = dst_ds.CreateLayer( 'FormatTests__FormatTable' )
 
@@ -225,6 +226,24 @@ def ogr_interlis1_5():
     dst_feat = ogr.Feature( feature_def = dst_lyr.GetLayerDefn() )
     dst_feat.SetFrom( feat )
     dst_lyr.CreateFeature( dst_feat )
+
+    dst_ds = None
+
+    with open(outfile) as file:
+        itf = file.read()
+        expected = """MTID INTERLIS1
+MODL OGR
+ETOP
+TOPI FormatTests
+TABL FormatTable
+OBJE 0 0 aa_bb cc^dd @ 1
+ETAB
+ETOP
+EMOD
+ENDE"""
+        if expected not in itf:
+            gdaltest.post_reason("Interlis output doesn't match.")
+            return 'fail'
 
     return 'success'
 
@@ -241,7 +260,8 @@ def ogr_interlis1_6():
     feat = lyr.GetNextFeature()
 
     driver = ogr.GetDriverByName( 'Interlis 1' )
-    dst_ds = driver.CreateDataSource('tmp/interlis1_6.itf,data/ili/format-default.imd')
+    outfile = "tmp/interlis1_6.itf"
+    dst_ds = driver.CreateDataSource(outfile+",data/ili/format-default.imd")
 
     dst_lyr = dst_ds.CreateLayer( 'test' )
 
@@ -251,6 +271,24 @@ def ogr_interlis1_6():
     dst_feat = ogr.Feature( feature_def = dst_lyr.GetLayerDefn() )
     dst_feat.SetFrom( feat )
     dst_lyr.CreateFeature( dst_feat )
+
+    dst_ds = None
+
+    with open(outfile) as file:
+        itf = file.read()
+        expected = """MTID INTERLIS1
+MODL FormatDefault
+TOPI FormatTests
+TABL test
+OBJE 1 0 aa_bb cc^dd @ 1
+ETAB
+ETOP
+EMOD
+ENDE"""
+        if expected not in itf:
+            gdaltest.post_reason("Interlis output doesn't match.")
+            print itf
+            return 'fail'
 
     return 'success'
 
@@ -299,7 +337,8 @@ def ogr_interlis1_7():
 
     #Write back
     driver = ogr.GetDriverByName( 'Interlis 1' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis1_7.itf,data/ili/format-default.imd' )
+    outfile = "tmp/interlis1_7.itf"
+    dst_ds = driver.CreateDataSource(outfile+",data/ili/format-default.imd")
 
     dst_lyr = dst_ds.CreateLayer( 'FormatTests__FormatTable' )
 
@@ -309,6 +348,24 @@ def ogr_interlis1_7():
     dst_feat = ogr.Feature( feature_def = dst_lyr.GetLayerDefn() )
     dst_feat.SetFrom( feat )
     dst_lyr.CreateFeature( dst_feat )
+
+    dst_ds = None
+
+    with open(outfile) as file:
+        itf = file.read()
+        expected = """MTID INTERLIS1
+MODL FormatDefault
+TABL FormatTable
+OBJE 2 0 äöü ÄÖÜ @ 1
+ETAB
+ETOP
+EMOD
+ENDE"""
+        expected = expected.decode('utf8').encode('iso-8859-1')
+        if expected not in itf:
+            gdaltest.post_reason("Interlis output doesn't match.")
+            print itf
+            return 'fail'
 
     return 'success'
 
@@ -662,7 +719,8 @@ def ogr_interlis2_3():
     feat = lyr.GetNextFeature()
 
     driver = ogr.GetDriverByName( 'Interlis 2' )
-    dst_ds = driver.CreateDataSource( 'tmp/interlis2_3.xtf,data/ili/RoadsExdm2ien.imd' )
+    outfile = "tmp/interlis2_3.xtf"
+    dst_ds = driver.CreateDataSource(outfile+",data/ili/RoadsExdm2ien.imd")
 
     dst_lyr = dst_ds.CreateLayer( 'RoadsExdm2ien.RoadsExtended.RoadSign' )
 
@@ -685,6 +743,65 @@ def ogr_interlis2_3():
     dst_feat.SetFrom( feat )
     dst_lyr.CreateFeature( dst_feat )
 
+    dst_ds = None
+
+    with open(outfile) as file:
+        xtf = file.read()
+        expected = """<?xml version="1.0" encoding="utf-8" ?>
+<TRANSFER xmlns="http://www.interlis.ch/INTERLIS2.3">
+<HEADERSECTION SENDER="OGR/GDAL"""
+        if expected not in xtf:
+            gdaltest.post_reason("Interlis output doesn't match.")
+            return 'fail'
+        expected = """<MODELS>
+<MODEL NAME="RoadsExdm2ben" URI="http://www.interlis.ch/models" VERSION="2005-06-16"/>
+<MODEL NAME="RoadsExdm2ien" URI="http://www.interlis.ch/models" VERSION="2005-06-16"/>
+</MODELS>
+</HEADERSECTION>
+<DATASECTION>
+<RoadsExdm2ien.RoadsExtended BID="RoadsExdm2ien.RoadsExtended">
+<RoadsExdm2ien.RoadsExtended.RoadSign TID="501">
+<Position>
+<COORD><C1>69.389</C1><C2>92.056</C2></COORD>
+</Position>
+<Type>prohibition.noparking</Type>
+</RoadsExdm2ien.RoadsExtended.RoadSign>
+<RoadsExdm2ben.Roads.LandCover TID="16">
+<Geometry>
+<SURFACE>
+<BOUNDARY>
+<POLYLINE>
+<COORD><C1>39.038</C1><C2>60.315</C2></COORD>
+<COORD><C1>41.2</C1><C2>59.302</C2></COORD>
+<COORD><C1>43.362</C1><C2>60.315</C2></COORD>
+<COORD><C1>44.713</C1><C2>66.268</C2></COORD>
+<COORD><C1>45.794</C1><C2>67.66200000000001</C2></COORD>
+<COORD><C1>48.766</C1><C2>67.408</C2></COORD>
+<COORD><C1>53.36</C1><C2>64.11499999999999</C2></COORD>
+<COORD><C1>56.197</C1><C2>62.595</C2></COORD>
+<COORD><C1>57.818</C1><C2>63.862</C2></COORD>
+<COORD><C1>58.899</C1><C2>68.928</C2></COORD>
+<COORD><C1>55.927</C1><C2>72.348</C2></COORD>
+<COORD><C1>47.955</C1><C2>75.515</C2></COORD>
+<COORD><C1>42.281</C1><C2>75.38800000000001</C2></COORD>
+<COORD><C1>39.308</C1><C2>73.235</C2></COORD>
+<COORD><C1>36.741</C1><C2>69.688</C2></COORD>
+<COORD><C1>35.525</C1><C2>66.268</C2></COORD>
+<COORD><C1>35.661</C1><C2>63.735</C2></COORD>
+<COORD><C1>37.957</C1><C2>61.455</C2></COORD>
+<COORD><C1>39.038</C1><C2>60.315</C2></COORD>
+</POLYLINE>
+</BOUNDARY>
+</SURFACE>
+</Geometry>
+<Type>water</Type>
+</RoadsExdm2ben.Roads.LandCover>
+</RoadsExdm2ien.RoadsExtended>
+</DATASECTION>
+</TRANSFER>"""
+        if expected not in xtf:
+            gdaltest.post_reason("Interlis output doesn't match.")
+            return 'fail'
     return 'success'
 
 ###############################################################################
