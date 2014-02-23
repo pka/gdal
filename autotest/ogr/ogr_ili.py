@@ -416,48 +416,34 @@ def ogr_interlis1_9():
     return 'success'
 
 ###############################################################################
-# Ili1 VRT join
+# Ili1 Area with polygonizing
 
 def ogr_interlis1_10():
 
     if not gdaltest.have_ili_reader:
         return 'skip'
 
-    ds = ogr.Open( 'data/ili/Beispiel-join.vrt' ) #broken without enums
-    layers = ['BoFlaechenJoined']
-    if ds.GetLayerCount() != len(layers):
-        gdaltest.post_reason( 'layer count wrong.' )
-        return 'fail'
+    ds = ogr.Open('data/ili/Beispiel.itf,data/ili/Beispiel.imd')
 
-    for i in range(ds.GetLayerCount()):
-      if not ds.GetLayer(i).GetName() in layers:
-          gdaltest.post_reason( 'Did not get right layers' )
-          return 'fail'
-
-    lyr = ds.GetLayerByName('BoFlaechenJoined')
-
-    #TODO: Test that attribute filters are passed through to an underlying layer.
-    #lyr.SetAttributeFilter( 'other = "Second"' )
-    #lyr.ResetReading()
+    lyr = ds.GetLayerByName('Bodenbedeckung__BoFlaechen')
 
     if lyr.GetFeatureCount() != 3:
         gdaltest.post_reason( 'feature count wrong.' )
         return 'fail'
 
     feat = lyr.GetNextFeature()
+    geom_field_values = ['POINT (148.2 183.48)', 'POLYGON ((146.92 174.98,138.68 187.51,147.04 193.0,149.79 188.82,158.15 194.31,163.64 185.96,146.92 174.98))']
 
-    field_values = ['10', 0, 148.2, 183.48,'Gebaeude',  -1]
-
-    if feat.GetFieldCount() != len(field_values)-1:
-        gdaltest.post_reason( 'field count wrong.' )
+    if feat.GetGeomFieldCount() != len(geom_field_values):
+        gdaltest.post_reason( 'geom field count wrong.' )
+        print feat.GetGeomFieldCount()
         return 'fail'
 
-    for i in range(feat.GetFieldCount()):
-        if feat.GetFieldAsString(i) != str(field_values[i]):
-          feat.DumpReadable()
-          print(feat.GetFieldAsString(i))
-          gdaltest.post_reason( 'field value wrong.' )
-          return 'fail'
+    for i in range(feat.GetGeomFieldCount()):
+        geom = feat.GetGeomFieldRef(i)
+        if ogrtest.check_feature_geometry(geom, geom_field_values[i]) != 0:
+            feat.DumpReadable()
+            return 'fail'
 
     return 'success'
 
@@ -606,6 +592,19 @@ def ogr_interlis1_13():
           print(feat.GetFieldAsString(i))
           gdaltest.post_reason( 'field value wrong.' )
           return 'fail'
+
+    geom_field_values = ['POLYGON ((598600.961 249487.174,598608.899 249538.768,598624.774 249594.331,598648.586 249630.05,598684.305 249661.8,598763.68 249685.612,598850.993 249685.612,598854.962 249618.143,598843.055 249550.675,598819.243 249514.956,598763.68 249479.237,598692.243 249447.487,598612.868 249427.643,598600.961 249487.174))']
+
+    if feat.GetGeomFieldCount() != len(geom_field_values):
+        gdaltest.post_reason( 'geom field count wrong.' )
+        print feat.GetGeomFieldCount()
+        return 'fail'
+
+    for i in range(feat.GetGeomFieldCount()):
+        geom = feat.GetGeomFieldRef(i)
+        if ogrtest.check_feature_geometry(geom, geom_field_values[i]) != 0:
+            feat.DumpReadable()
+            return 'fail'
 
     return 'success'
 
@@ -943,7 +942,7 @@ gdaltest_list = [
     ogr_interlis1_6,
     ogr_interlis1_7,
     ogr_interlis1_9,
-    #ogr_interlis1_10,
+    ogr_interlis1_10,
     ogr_interlis1_11,
     ogr_interlis1_12,
     ogr_interlis1_13,

@@ -264,18 +264,13 @@ public:
                             CPLString lineLayerName = GetName() + CPLString("_") + psName;
                             AddGeomTable(lineLayerName, psName, wkbMultiLineString);
 
-                            // OGR 1.10 had a seperate areay polygon table:
-                            // CPLString areaLayerName = GetName() + CPLString("__Areas");
-                            // AddGeomTable(areaLayerName, psName, wkbPolygon);
-                            // areaLayer->SetAreaLayers(layer, areaLineLayer);
-
                             //Add geometry field for polygonized areas
                             AddGeomField(psName, wkbPolygon);
                         } else if (EQUAL(psKind, "Surface"))
                         {
                             CPLString geomLayerName = GetName() + CPLString("_") + psName;
                             AddGeomTable(geomLayerName, psName, wkbPolygon);
-                            //layer->SetSurfacePolyLayer(polyLayer, layer->GetLayerDefn()->GetGeomFieldCount()-1);
+                            AddGeomField(psName, wkbPolygon);
                         } else { // Polyline, DirectedPolyline
                             AddGeomField(psName, wkbMultiLineString);
                         }
