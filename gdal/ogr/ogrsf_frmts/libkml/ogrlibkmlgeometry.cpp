@@ -154,9 +154,33 @@ ElementPtr geom2kml (
     case wkbLineString:
         poOgrLineString = ( OGRLineString * ) poOgrGeom;
 
-        coordinates = poKmlFactory->CreateCoordinates (  );
+        if( extra >= 0 )
+        {
+            ((OGRLinearRing*)poOgrGeom)->closeRings();
+        }
 
         numpoints = poOgrLineString->getNumPoints (  );
+        if( extra >= 0 )
+        {
+            if( numpoints < 4 && 
+                CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+            {
+                CPLError(CE_Failure, CPLE_NotSupported, "A linearring should have at least 4 points");
+                return NULL;
+            }
+        }
+        else
+        {
+            if( numpoints < 2 && 
+                CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+            {
+                CPLError(CE_Failure, CPLE_NotSupported, "A linestring should have at least 2 points");
+                return NULL;
+            }
+        }
+
+        coordinates = poKmlFactory->CreateCoordinates (  );
+
         poOgrPoint = new OGRPoint (  );
 
         for ( i = 0; i < numpoints; i++ ) {
@@ -205,9 +229,34 @@ ElementPtr geom2kml (
 
         poOgrLineString = ( OGRLineString * ) poOgrGeom;
 
+        if( extra >= 0 )
+        {
+            ((OGRLinearRing*)poOgrGeom)->closeRings();
+        }
+
+        numpoints = poOgrLineString->getNumPoints (  );
+        if( extra >= 0 )
+        {
+            if( numpoints < 4 && 
+                CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+            {
+                CPLError(CE_Failure, CPLE_NotSupported, "A linearring should have at least 4 points");
+                return NULL;
+            }
+        }
+        else
+        {
+            if( numpoints < 2 && 
+                CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+            {
+                CPLError(CE_Failure, CPLE_NotSupported, "A linestring should have at least 2 points");
+                return NULL;
+            }
+        }
+
         coordinates = poKmlFactory->CreateCoordinates (  );
         poOgrPoint = new OGRPoint (  );
-        numpoints = poOgrLineString->getNumPoints (  );
+
         for ( i = 0; i < numpoints; i++ ) {
             poOgrLineString->getPoint ( i, poOgrPoint );
 
@@ -254,6 +303,14 @@ ElementPtr geom2kml (
 
     case wkbPolygon:
 
+        CPLErrorReset();
+        if( CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) &&
+            OGRGeometryFactory::haveGEOS() && (!poOgrGeom->IsValid() ||
+             CPLGetLastErrorType() != CE_None) )
+        {
+            CPLError(CE_Failure, CPLE_NotSupported, "Invalid polygon");
+            return NULL;
+        }
         poOgrPolygon = ( OGRPolygon * ) poOgrGeom;
 
         poKmlGeometry = poKmlPolygon = poKmlFactory->CreatePolygon (  );
@@ -275,6 +332,14 @@ ElementPtr geom2kml (
 
     case wkbPolygon25D:
 
+        CPLErrorReset();
+        if( CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) &&
+            OGRGeometryFactory::haveGEOS() && (!poOgrGeom->IsValid() ||
+             CPLGetLastErrorType() != CE_None) )
+        {
+            CPLError(CE_Failure, CPLE_NotSupported, "Invalid polygon");
+            return NULL;
+        }
         poOgrPolygon = ( OGRPolygon * ) poOgrGeom;
 
         poKmlGeometry = poKmlPolygon = poKmlFactory->CreatePolygon (  );
@@ -305,15 +370,30 @@ ElementPtr geom2kml (
 
         poOgrMultiGeom = ( OGRGeometryCollection * ) poOgrGeom;
 
-        poKmlGeometry = poKmlMultiGeometry =
-            poKmlFactory->CreateMultiGeometry (  );
-
         nGeom = poOgrMultiGeom->getNumGeometries (  );
-        for ( i = 0; i < nGeom; i++ ) {
-            poKmlTmpGeometry = geom2kml ( poOgrMultiGeom->getGeometryRef ( i ),
-                                          -1, wkb25D, poKmlFactory );
-            poKmlMultiGeometry->
-                add_geometry ( AsGeometry ( poKmlTmpGeometry ) );
+
+        if( nGeom == 1 && 
+            CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+        {
+            CPLDebug("LIBKML", "Turning multiple geometry into single geometry");
+            poKmlGeometry = geom2kml( poOgrMultiGeom->getGeometryRef ( 0 ),
+                                      -1, wkb25D, poKmlFactory );
+        }
+        else
+        {
+            if( nGeom == 0 && 
+                CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+            {
+                CPLError(CE_Warning, CPLE_AppDefined, "Empty multi geometry are not recommended");
+            }
+            poKmlGeometry = poKmlMultiGeometry =
+                poKmlFactory->CreateMultiGeometry (  );
+            for ( i = 0; i < nGeom; i++ ) {
+                poKmlTmpGeometry = geom2kml ( poOgrMultiGeom->getGeometryRef ( i ),
+                                            -1, wkb25D, poKmlFactory );
+                poKmlMultiGeometry->
+                    add_geometry ( AsGeometry ( poKmlTmpGeometry ) );
+            }
         }
 
         break;

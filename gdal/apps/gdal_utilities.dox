@@ -33,6 +33,7 @@ The following utility programs are distributed with GDAL.
 <li> \ref gdalsrsinfo - Report a given SRS in different formats.  (GDAL >= 1.9.0)
 <li> \ref gdalmove - Transform the coordinate system of a file (GDAL >= 1.10)
 <li> \ref gdal_edit - Edit in place various information of an existing GDAL dataset (projection, geotransform, nodata, metadata)
+<li> \ref gdal_calc - Command line raster calculator with numpy syntax
 <li> \ref gdal-config - Get options required to build software using GDAL.
 <li> \ref gdalmanage - Identify, copy, rename and delete raster.
 <li> \ref gdalcompare - Compare two images and report on differences.
@@ -303,7 +304,7 @@ gdal_translate [--help-general]
        [-a_srs srs_def] [-a_ullr ulx uly lrx lry] [-a_nodata value]
        [-gcp pixel line easting northing [elevation]]*
        [-mo "META-TAG=VALUE"]* [-q] [-sds]
-       [-co "NAME=VALUE"]* [-stats]
+       [-co "NAME=VALUE"]* [-stats] [-norat]
        src_dataset dst_dataset
 \endverbatim
 
@@ -404,6 +405,7 @@ output.</dd>
 output files.  Use with formats like HDF or OGDI that have subdatasets.
 The output file naming scheme has changed in GDAL 1.11 (e.g. ofile_1.tif, ofile_2.tif).</dd>
 <dt> <b>-stats</b>:</dt><dd> (GDAL >= 1.8.0) Force (re)computation of statistics.</dd>
+<dt> <b>-norat</b></dt><dd> (GDAL >= 2.0) Do not copy source RAT into destination dataset.</dd>
 <dt> <i>src_dataset</i>:</dt><dd>The source dataset name. It can be either
 file name, URL of data source or subdataset name for multi-dataset files.</dd>
 <dt> <i>dst_dataset</i>:</dt><dd> The destination file name.</dd>
@@ -2037,8 +2039,14 @@ Usage:
                 [-compute_edges] [-b Band (default=1)] [-of format] [-q]
 
 Notes :
-  Scale is the ratio of vertical units to horizontal
-   for Feet:Latlong use scale=370400, for Meters:LatLong use scale=111120)
+  gdaldem generally assumes that x, y and z units are identical.  If x (east-west)
+  and y (north-south) units are identical, but z (elevation) units are different, the
+  scale (-s) option can be used to set the ratio of vertical units to horizontal.  For 
+  LatLong projections near the equator, where units of latitude and units of 
+  longitude are similar, elevation (z) units can be converted to be compatible
+  by using scale=370400 (if elevation is in feet) or scale=111120 (if elevation is in 
+  meters).  For locations not near the equator, it would be best to reproject your
+  grid using gdalwarp before using gdaldem.
 
 \endverbatim
 \if man

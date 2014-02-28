@@ -218,19 +218,20 @@ int  GenerateRootKml(const char* filename,
     VSIFPrintfL(fp, "\t<Document>\n");
     VSIFPrintfL(fp, "\t\t<name>%s</name>\n", tmpfilename);
     VSIFPrintfL(fp, "\t\t<description></description>\n");
-    VSIFPrintfL(fp, "\t\t<Style>\n");
+    VSIFPrintfL(fp, "\t\t<styleUrl>#hideChildrenStyle</styleUrl>\n");
+    VSIFPrintfL(fp, "\t\t<Style id=\"hideChildrenStyle\">\n");
     VSIFPrintfL(fp, "\t\t\t<ListStyle id=\"hideChildren\">\n");
     VSIFPrintfL(fp, "\t\t\t\t<listItemType>checkHideChildren</listItemType>\n");
     VSIFPrintfL(fp, "\t\t\t</ListStyle>\n");
     VSIFPrintfL(fp, "\t\t</Style>\n");
-    VSIFPrintfL(fp, "\t\t<Region>\n");
+    /*VSIFPrintfL(fp, "\t\t<Region>\n");
     VSIFPrintfL(fp, "\t\t\t<LatLonAltBox>\n");
     VSIFPrintfL(fp, "\t\t\t\t<north>%f</north>\n", north);
     VSIFPrintfL(fp, "\t\t\t\t<south>%f</south>\n", south);
     VSIFPrintfL(fp, "\t\t\t\t<east>%f</east>\n", east);
     VSIFPrintfL(fp, "\t\t\t\t<west>%f</west>\n", west);
     VSIFPrintfL(fp, "\t\t\t</LatLonAltBox>\n");
-    VSIFPrintfL(fp, "\t\t</Region>\n");
+    VSIFPrintfL(fp, "\t\t</Region>\n");*/
     VSIFPrintfL(fp, "\t\t<NetworkLink>\n");
     VSIFPrintfL(fp, "\t\t\t<open>1</open>\n");
     VSIFPrintfL(fp, "\t\t\t<Region>\n");
@@ -348,7 +349,8 @@ int  GenerateChildKml(std::string filename,
     VSIFPrintfL(fp, "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\">\n");
     VSIFPrintfL(fp, "\t<Document>\n");
     VSIFPrintfL(fp, "\t\t<name>%d/%d/%d.kml</name>\n", zoom, ix, iy);
-    VSIFPrintfL(fp, "\t\t<Style>\n");
+    VSIFPrintfL(fp, "\t\t<styleUrl>#hideChildrenStyle</styleUrl>\n");
+    VSIFPrintfL(fp, "\t\t<Style id=\"hideChildrenStyle\">\n");
     VSIFPrintfL(fp, "\t\t\t<ListStyle id=\"hideChildren\">\n");
     VSIFPrintfL(fp, "\t\t\t\t<listItemType>checkHideChildren</listItemType>\n");
     VSIFPrintfL(fp, "\t\t\t</ListStyle>\n");

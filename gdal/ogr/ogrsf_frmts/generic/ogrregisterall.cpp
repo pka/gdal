@@ -101,6 +101,7 @@ void OGRRegisterAll()
     RegisterOGRGMT();
 #endif
 #ifdef SQLITE_ENABLED
+    RegisterOGRGeoPackage();
     RegisterOGRSQLite();
 #endif
 #ifdef DODS_ENABLED
@@ -142,6 +143,10 @@ void OGRRegisterAll()
 #endif
 #ifdef SDE_ENABLED
     RegisterOGRSDE();
+#endif
+/* Register OpenFileGDB before FGDB as it is more capable for read-only */
+#ifdef OPENFILEGDB_ENABLED
+    RegisterOGROpenFileGDB();
 #endif
 #ifdef FGDB_ENABLED
     RegisterOGRFileGDB();

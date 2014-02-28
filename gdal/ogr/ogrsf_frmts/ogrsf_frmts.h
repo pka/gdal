@@ -447,10 +447,12 @@ void CPL_DLL RegisterOGRXLS();
 void CPL_DLL RegisterOGRODS();
 void CPL_DLL RegisterOGRXLSX();
 void CPL_DLL RegisterOGRElastic();
+void CPL_DLL RegisterOGRGeoPackage();
 void CPL_DLL RegisterOGRPDF();
 void CPL_DLL RegisterOGRWalk();
 void CPL_DLL RegisterOGRCartoDB();
 void CPL_DLL RegisterOGRSXF();
+void CPL_DLL RegisterOGROpenFileGDB();
 CPL_C_END
 
 

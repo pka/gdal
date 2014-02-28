@@ -62,7 +62,7 @@ static void Usage(const char* pszErrorMsg = NULL, int bShort = TRUE)
             "       [-a_srs srs_def] [-a_ullr ulx uly lrx lry] [-a_nodata value]\n"
             "       [-gcp pixel line easting northing [elevation]]*\n" 
             "       [-mo \"META-TAG=VALUE\"]* [-q] [-sds]\n"
-            "       [-co \"NAME=VALUE\"]* [-stats]\n"
+            "       [-co \"NAME=VALUE\"]* [-stats] [-norat]\n"
             "       src_dataset dst_dataset\n" );
 
     if( !bShort )
@@ -317,6 +317,7 @@ static int ProxyMain( int argc, char ** argv )
     int                 bStats = FALSE, bApproxStats = FALSE;
     int                 bErrorOnPartiallyOutside = FALSE;
     int                 bErrorOnCompletelyOutside = FALSE;
+    int                 bNoRAT = FALSE;
 
 
     anSrcWin[0] = 0;
@@ -707,7 +708,10 @@ static int ProxyMain( int argc, char ** argv )
             bStats = TRUE;
             bApproxStats = TRUE;
         }
-
+        else if( EQUAL(argv[i], "-norat") )
+        {
+            bNoRAT = TRUE;
+        }
         else if( argv[i][0] == '-' )
         {
             Usage(CPLSPrintf("Unknown option name '%s'", argv[i]));
@@ -929,9 +933,9 @@ static int ProxyMain( int argc, char ** argv )
         }
 
         anSrcWin[0] = (int) 
-            ((dfULX - adfGeoTransform[0]) / adfGeoTransform[1] + 0.001);
+            floor((dfULX - adfGeoTransform[0]) / adfGeoTransform[1] + 0.001);
         anSrcWin[1] = (int) 
-            ((dfULY - adfGeoTransform[3]) / adfGeoTransform[5] + 0.001);
+            floor((dfULY - adfGeoTransform[3]) / adfGeoTransform[5] + 0.001);
 
         anSrcWin[2] = (int) ((dfLRX - dfULX) / adfGeoTransform[1] + 0.5);
         anSrcWin[3] = (int) ((dfLRY - dfULY) / adfGeoTransform[5] + 0.5);
@@ -1038,13 +1042,13 @@ static int ProxyMain( int argc, char ** argv )
         && pszOXSize == NULL && pszOYSize == NULL );
 
     if( eOutputType == GDT_Unknown 
-        && nScaleRepeat == 0 && !bUnscale
+        && nScaleRepeat == 0 && nExponentRepeat == 0 && !bUnscale
         && CSLCount(papszMetadataOptions) == 0 && bDefBands 
         && eMaskMode == MASK_AUTO
         && bSpatialArrangementPreserved
         && nGCPCount == 0 && !bGotBounds
         && pszOutputSRS == NULL && !bSetNoData && !bUnsetNoData
-        && nRGBExpand == 0 && !bStats )
+        && nRGBExpand == 0 && !bStats && !bNoRAT )
     {
         
         hOutDS = GDALCreateCopy( hDriver, pszDest, hDataset, 
@@ -1391,10 +1395,9 @@ static int ProxyMain( int argc, char ** argv )
 
         if( bScale )
         {
+            /* To avoid a divide by zero */
             if( dfScaleSrcMax == dfScaleSrcMin )
                 dfScaleSrcMax += 0.1;
-            if( dfScaleDstMax == dfScaleDstMin )
-                dfScaleDstMax += 0.1;
 
             if( !bExponentScaling )
             {

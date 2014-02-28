@@ -53,7 +53,7 @@ and return the result.</dd>
 Starting with GDAL 1.10, the "SQLITE" dialect can also be used with any datasource.</dd>
 <dt> <b>-spat</b> <i>xmin ymin xmax ymax</i>:</dt><dd> The area of interest.  Only
 features within the rectangle will be reported.</dd>
-<dt> <b>-geomfield>/b> <i>field</i>:</dt><dd> (OGR &gt;= 2.0) Name of the geometry field
+<dt> <b>-geomfield</b> <i>field</i>:</dt><dd> (OGR &gt;= 2.0) Name of the geometry field
 on which the spatial filter operates on.</dd>
 <dt> <b>-fid</b> <i>fid</i>:</dt><dd> If provided, only the feature with this feature
 id will be reported.  Operates exclusive of the spatial or attribute 
@@ -234,7 +234,7 @@ Starting with GDAL 1.10, the "SQLITE" dialect can also be used with any datasour
 <dt> <b>-skipfailures</b>:</dt><dd>Continue after a failure, skipping the failed feature.</dd>
 <dt> <b>-spat</b><em> xmin ymin xmax ymax</em>:</dt><dd> spatial query extents. Only features
 whose geometry intersects the extents will be selected. The geometries will not be clipped unless -clipsrc is specified</dd>
-<dt> <b>-geomfield>/b> <i>field</i>:</dt><dd> (OGR &gt;= 2.0) Name of the geometry field
+<dt> <b>-geomfield</b> <i>field</i>:</dt><dd> (OGR &gt;= 2.0) Name of the geometry field
 on which the spatial filter operates on.</dd>
 <dt> <b>-dsco</b> <em>NAME=VALUE</em>:</dt><dd> Dataset creation option (format specific)</dd>
 <dt> <b>-lco</b><em>  NAME=VALUE</em>:</dt><dd> Layer creation option (format specific)</dd>
@@ -269,7 +269,7 @@ known definition (ie. EPSG:4326) or a file with a WKT definition.
 Advanced options :
 
 <dl>
-<dt> <b>-gt</b> <em>n</em>:</dt><dd> group <em>n</em> features per transaction (default 200). Increase the value
+<dt> <b>-gt</b> <em>n</em>:</dt><dd> group <em>n</em> features per transaction (default 20000 in OGR 1.11, 200 in previous releases). Increase the value
 for better performance when writing into DBMS drivers that have transaction support.</dd>
 <dt> <b>-clipsrc</b><em> [xmin ymin xmax ymax]|WKT|datasource|spat_extent</em>:
 </dt><dd> (starting with GDAL 1.7.0) clip geometries to the specified bounding
@@ -329,8 +329,7 @@ When writing into transactional DBMS (SQLite/PostgreSQL,MySQL, etc...),
 it might be beneficial to increase the number
 of INSERT statements executed between BEGIN TRANSACTION and COMMIT TRANSACTION statements.
 This number is specified with the -gt option. For example, for SQLite, explicitly defining
-<b>-gt 1024</b> usually ensures a noticeable performance boost;
-defining an even bigger <b>-gt 65536</b> ensures optimal performance while
+<b>-gt 65536</b> ensures optimal performance while
 populating some table containing many hundredth thousand or million rows. However, note that
 if there are failed insertions, the scope of -skipfailures is a whole transaction.
 

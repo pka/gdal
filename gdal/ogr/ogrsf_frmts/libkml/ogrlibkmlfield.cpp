@@ -42,6 +42,7 @@ using kmldom::DataPtr;
 using kmldom::TimeStampPtr;
 using kmldom::TimeSpanPtr;
 using kmldom::TimePrimitivePtr;
+using kmldom::SnippetPtr;
 
 using kmldom::PointPtr;
 using kmldom::LineStringPtr;
@@ -52,6 +53,7 @@ using kmldom::GeometryPtr;
 using kmldom::FeaturePtr;
 using kmldom::GroundOverlayPtr;
 using kmldom::IconPtr;
+using kmldom::CameraPtr;
 
 #include "ogr_libkml.h"
 
@@ -311,6 +313,8 @@ void field2kml (
     int nFields = poOgrFeat->GetFieldCount (  );
     int iSkip1 = -1;
     int iSkip2 = -1;
+    int iAltitudeMode = kmldom::ALTITUDEMODE_CLAMPTOGROUND;
+    int isGX = FALSE;
 
     for ( i = 0; i < nFields; i++ ) {
 
@@ -370,30 +374,7 @@ void field2kml (
                 else if ( EQUAL ( name, oFC.altitudeModefield ) ) {
                     const char *pszAltitudeMode = pszUTF8String ;
 
-                    int isGX = FALSE;
-                    int iAltitudeMode = kmldom::ALTITUDEMODE_CLAMPTOGROUND;
-
-                    if ( EQUAL ( pszAltitudeMode, "clampToGround" ) )
-                        iAltitudeMode = kmldom::ALTITUDEMODE_CLAMPTOGROUND;
-
-                    else if ( EQUAL ( pszAltitudeMode, "relativeToGround" ) )
-                        iAltitudeMode = kmldom::ALTITUDEMODE_RELATIVETOGROUND;
-
-                    else if ( EQUAL ( pszAltitudeMode, "absolute" ) )
-                        iAltitudeMode = kmldom::ALTITUDEMODE_ABSOLUTE;
-
-                    else if ( EQUAL ( pszAltitudeMode, "relativeToSeaFloor" ) ) {
-                        iAltitudeMode =
-                            kmldom::GX_ALTITUDEMODE_RELATIVETOSEAFLOOR;
-                        isGX = TRUE;
-                    }
-
-                    else if ( EQUAL ( pszAltitudeMode, "clampToSeaFloor" ) ) {
-                        iAltitudeMode =
-                            kmldom::GX_ALTITUDEMODE_CLAMPTOSEAFLOOR;
-                        isGX = TRUE;
-                    }
-
+                    iAltitudeMode = kmlAltitudeModeFromString(pszAltitudeMode, isGX);
 
                     if ( poKmlPlacemark->has_geometry (  ) ) {
                         GeometryPtr poKmlGeometry =
@@ -464,6 +445,20 @@ void field2kml (
 
                     continue;
                 }
+
+                /***** snippet *****/
+
+                else if  ( EQUAL ( name, oFC.snippetfield ) ) {
+
+                    SnippetPtr snippet = poKmlFactory->CreateSnippet (  );
+                    snippet->set_text(pszUTF8String);
+                    poKmlPlacemark->set_snippet ( snippet );
+
+                    CPLFree( pszUTF8String );
+
+                    continue;
+
+                }
                 
                 /***** other *****/
 
@@ -476,6 +471,9 @@ void field2kml (
                 break;
             }
 
+        /* This code checks if there's a OFTTime field with the same name */
+        /* that could be used to compose a DateTime. Not sure this is really */
+        /* supported in OGR data model to have 2 fields with same name... */
         case OFTDate:          //   Date
             {
                 poOgrFeat->GetFieldAsDateTime ( i, &year, &month, &day,
@@ -525,7 +523,9 @@ void field2kml (
 
             }
 
-
+        /* This code checks if there's a OFTTime field with the same name */
+        /* that could be used to compose a DateTime. Not sure this is really */
+        /* supported in OGR data model to have 2 fields with same name... */
         case OFTTime:          //   Time
             {
                 poOgrFeat->GetFieldAsDateTime ( i, &year, &month, &day,
@@ -542,7 +542,7 @@ void field2kml (
                     OGRFieldType type2 = poOgrFieldDef2->GetType (  );
                     const char *name2 = poOgrFieldDef2->GetNameRef (  );
 
-                    if ( EQUAL ( name2, name ) && type2 == OFTTime &&
+                    if ( EQUAL ( name2, name ) && type2 == OFTDate &&
                          ( EQUAL ( name, oFC.tsfield ) ||
                            EQUAL ( name, oFC.beginfield ) ||
                            EQUAL ( name, oFC.endfield ) ) ) {
@@ -652,10 +652,21 @@ void field2kml (
 
                 if ( poKmlPlacemark->has_geometry (  )
                      && -1 < poOgrFeat->GetFieldAsInteger ( i ) ) {
-                    GeometryPtr poKmlGeometry =
-                        poKmlPlacemark->get_geometry (  );
-                    ogr2extrude_rec ( poOgrFeat->GetFieldAsInteger ( i ),
-                                      poKmlGeometry );
+                    int iExtrude = poOgrFeat->GetFieldAsInteger ( i );
+                    if( iExtrude &&
+                        isGX == FALSE && iAltitudeMode == kmldom::ALTITUDEMODE_CLAMPTOGROUND &&
+                        CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+                    {
+                        CPLError(CE_Warning, CPLE_NotSupported,
+                            "altitudeMode=clampToGround unsupported with extrude=1");
+                    }
+                    else
+                    {
+                        GeometryPtr poKmlGeometry =
+                            poKmlPlacemark->get_geometry (  );
+                        ogr2extrude_rec ( iExtrude,
+                                        poKmlGeometry );
+                    }
                 }
                 continue;
             }
@@ -667,10 +678,25 @@ void field2kml (
 
                 if ( poKmlPlacemark->has_geometry (  )
                      && -1 < poOgrFeat->GetFieldAsInteger ( i ) ) {
-                    GeometryPtr poKmlGeometry =
-                        poKmlPlacemark->get_geometry (  );
-                    ogr2tessellate_rec ( poOgrFeat->GetFieldAsInteger ( i ),
-                                         poKmlGeometry );
+                    int iTesselate = poOgrFeat->GetFieldAsInteger ( i );
+                    if( iTesselate &&
+                        !(isGX == FALSE && iAltitudeMode == kmldom::ALTITUDEMODE_CLAMPTOGROUND) &&
+                        !(isGX == TRUE && iAltitudeMode == kmldom::GX_ALTITUDEMODE_CLAMPTOSEAFLOOR) &&
+                        CSLTestBoolean(CPLGetConfigOption("LIBKML_STRICT_COMPLIANCE", "TRUE")) )
+                    {
+                        CPLError(CE_Warning, CPLE_NotSupported,
+                            "altitudeMode!=clampToGround && altitudeMode!=clampToSeaFloor unsupported with tesselate=1");
+                    }
+                    else
+                    {
+                        GeometryPtr poKmlGeometry =
+                            poKmlPlacemark->get_geometry (  );
+                        ogr2tessellate_rec ( iTesselate,
+                                            poKmlGeometry );
+                        if( isGX == FALSE && iAltitudeMode == kmldom::ALTITUDEMODE_CLAMPTOGROUND )
+                            ogr2altitudemode_rec ( poKmlGeometry, iAltitudeMode,
+                                                   isGX );
+                    }
                 }
 
                 continue;
@@ -703,6 +729,13 @@ void field2kml (
 
         case OFTReal:          //   Double Precision floating point
         {
+            if( EQUAL(name, oFC.headingfield) ||
+                EQUAL(name, oFC.tiltfield) ||
+                EQUAL(name, oFC.rollfield) )
+            {
+                continue;
+            }
+
             poKmlSimpleData = poKmlFactory->CreateSimpleData (  );
             poKmlSimpleData->set_name ( name );
 
@@ -972,6 +1005,68 @@ int kml2tessellate_rec (
     return FALSE;
 }
 
+/************************************************************************/
+/*                     ogrkmlSetAltitudeMode()                          */
+/************************************************************************/
+
+static void ogrkmlSetAltitudeMode(OGRFeature* poOgrFeat, int iField,
+                                  int nAltitudeMode, int bIsGX)
+{
+    if ( !bIsGX ) {
+        switch ( nAltitudeMode ) {
+        case kmldom::ALTITUDEMODE_CLAMPTOGROUND:
+            poOgrFeat->SetField ( iField, "clampToGround" );
+            break;
+
+        case kmldom::ALTITUDEMODE_RELATIVETOGROUND:
+            poOgrFeat->SetField ( iField, "relativeToGround" );
+            break;
+
+        case kmldom::ALTITUDEMODE_ABSOLUTE:
+            poOgrFeat->SetField ( iField, "absolute" );
+            break;
+
+        }
+    }
+
+    else {
+        switch ( nAltitudeMode ) {
+        case kmldom::GX_ALTITUDEMODE_RELATIVETOSEAFLOOR:
+            poOgrFeat->SetField ( iField, "relativeToSeaFloor" );
+            break;
+
+        case kmldom::GX_ALTITUDEMODE_CLAMPTOSEAFLOOR:
+            poOgrFeat->SetField ( iField, "clampToSeaFloor" );
+            break;
+        }
+    }
+}
+
+/************************************************************************/
+/*                            TrimSpaces()                              */
+/************************************************************************/
+
+static const char* TrimSpaces(string& oText)
+{
+
+    /* SerializePretty() adds a new line before the data */
+    /* ands trailing spaces. I believe this is wrong */
+    /* as it breaks round-tripping */
+
+    /* Trim trailing spaces */
+    while (oText.size() != 0 && oText[oText.size()-1] == ' ')
+        oText.resize(oText.size()-1);
+
+    /* Skip leading newline and spaces */
+    const char* pszText = oText.c_str (  );
+    if (pszText[0] == '\n')
+        pszText ++;
+    while (pszText[0] == ' ')
+        pszText ++;
+
+    return pszText;
+}
+
 /******************************************************************************
  function to read kml into ogr fields
 ******************************************************************************/
@@ -1119,37 +1214,7 @@ void kml2field (
 
             if ( kml2altitudemode_rec ( poKmlGeometry,
                                         &nAltitudeMode, &bIsGX ) ) {
-
-                if ( !bIsGX ) {
-
-                    switch ( nAltitudeMode ) {
-                    case kmldom::ALTITUDEMODE_CLAMPTOGROUND:
-                        poOgrFeat->SetField ( iField, "clampToGround" );
-                        break;
-
-                    case kmldom::ALTITUDEMODE_RELATIVETOGROUND:
-                        poOgrFeat->SetField ( iField, "relativeToGround" );
-                        break;
-
-                    case kmldom::ALTITUDEMODE_ABSOLUTE:
-                        poOgrFeat->SetField ( iField, "absolute" );
-                        break;
-
-                    }
-                }
-
-                else {
-                    switch ( nAltitudeMode ) {
-                    case kmldom::GX_ALTITUDEMODE_RELATIVETOSEAFLOOR:
-                        poOgrFeat->SetField ( iField, "relativeToSeaFloor" );
-                        break;
-
-                    case kmldom::GX_ALTITUDEMODE_CLAMPTOSEAFLOOR:
-                        poOgrFeat->SetField ( iField, "clampToSeaFloor" );
-                        break;
-                    }
-
-                }
+                ogrkmlSetAltitudeMode(poOgrFeat, iField, nAltitudeMode, bIsGX);
             }
 
         }
@@ -1174,6 +1239,52 @@ void kml2field (
         if ( iField > -1 )
             poOgrFeat->SetField ( iField, nExtrude );
 
+    }
+    
+    /***** camera *****/
+    
+    else if ( poKmlPlacemark &&
+              poKmlPlacemark->has_abstractview (  ) &&
+              poKmlPlacemark->get_abstractview()->IsA( kmldom::Type_Camera) ) {
+
+        const CameraPtr& camera = AsCamera(poKmlPlacemark->get_abstractview());
+
+        if( camera->has_heading() )
+        {
+            int iField = poOgrFeat->GetFieldIndex ( oFC.headingfield );
+            if ( iField > -1 )
+                poOgrFeat->SetField ( iField, camera->get_heading() );
+        }
+
+        if( camera->has_tilt() )
+        {
+            int iField = poOgrFeat->GetFieldIndex ( oFC.tiltfield );
+            if ( iField > -1 )
+                poOgrFeat->SetField ( iField, camera->get_tilt() );
+        }
+
+        if( camera->has_roll() )
+        {
+            int iField = poOgrFeat->GetFieldIndex ( oFC.rollfield );
+            if ( iField > -1 )
+                poOgrFeat->SetField ( iField, camera->get_roll() );
+        }
+
+        int nAltitudeMode = -1;
+
+        int iField = poOgrFeat->GetFieldIndex ( oFC.altitudeModefield );
+
+        if ( iField > -1 ) {
+
+            if ( camera->has_altitudemode (  ) ) {
+                nAltitudeMode = camera->get_altitudemode (  );
+                ogrkmlSetAltitudeMode(poOgrFeat, iField, nAltitudeMode, FALSE);
+            }
+            else if ( camera->has_gx_altitudemode (  ) ) {
+                nAltitudeMode = camera->get_gx_altitudemode (  );
+                ogrkmlSetAltitudeMode(poOgrFeat, iField, nAltitudeMode, TRUE);
+            }
+        }
     }
 
     /***** ground overlay *****/
@@ -1252,6 +1363,19 @@ void kml2field (
     if ( iField > -1 )
         poOgrFeat->SetField ( iField, nVisibility );
 
+    /***** snippet *****/
+
+    if ( poKmlFeature->has_snippet (  ) )
+    {
+        string oText = poKmlFeature->get_snippet (  )->get_text();
+
+        iField = poOgrFeat->GetFieldIndex ( oFC.snippetfield );
+
+        if ( iField > -1 )
+            poOgrFeat->SetField ( iField, TrimSpaces(oText) );
+    }
+
+    /***** extended schema *****/
     ExtendedDataPtr poKmlExtendedData = NULL;
 
     if ( poKmlFeature->has_extendeddata (  ) ) {
@@ -1294,22 +1418,7 @@ void kml2field (
                 if ( iField > -1 && poKmlSimpleData->has_text (  ) ) {
                     string oText = poKmlSimpleData->get_text (  );
 
-                    /* SerializePretty() adds a new line before the data */
-                    /* ands trailing spaces. I believe this is wrong */
-                    /* as it breaks round-tripping */
-
-                    /* Trim trailing spaces */
-                    while (oText.size() != 0 && oText[oText.size()-1] == ' ')
-                        oText.resize(oText.size()-1);
-
-                    /* Skip leading newline and spaces */
-                    const char* pszText = oText.c_str (  );
-                    if (pszText[0] == '\n')
-                        pszText ++;
-                    while (pszText[0] == ' ')
-                        pszText ++;
-
-                    poOgrFeat->SetField ( iField, pszText );
+                    poOgrFeat->SetField ( iField, TrimSpaces(oText) );
                 }
             }
         }
@@ -1376,17 +1485,14 @@ SimpleFieldPtr FieldDef2kml (
     case OFTRealList:
         poKmlSimpleField->set_type ( "float" );
         return poKmlSimpleField;
-			
-    case OFTBinary:
-        poKmlSimpleField->set_type ( "bool" );
-        return poKmlSimpleField;
 	
     case OFTString:
     case OFTStringList:
         if ( EQUAL ( pszFieldName, oFC.namefield ) ||
              EQUAL ( pszFieldName, oFC.descfield ) ||
              EQUAL ( pszFieldName, oFC.altitudeModefield ) ||
-             EQUAL ( pszFieldName, oFC.iconfield ) )
+             EQUAL ( pszFieldName, oFC.iconfield ) ||
+             EQUAL ( pszFieldName, oFC.snippetfield ) )
             break;
         poKmlSimpleField->set_type ( "string" );
         return poKmlSimpleField;
@@ -1449,7 +1555,7 @@ void kml2FeatureDef (
             osName = poKmlSimpleField->get_name (  );
         }
 
-        if ( EQUAL ( pszType, "bool" ) ||
+        if ( EQUAL ( pszType, "boolean" ) ||
              EQUAL ( pszType, "int" ) ||
              EQUAL ( pszType, "short" ) ||
              EQUAL ( pszType, "ushort" ) ) {
@@ -1503,4 +1609,48 @@ void get_fieldconfig( struct fieldconfig *oFC) {
                                                        "drawOrder" );
     oFC->iconfield = CPLGetConfigOption ( "LIBKML_ICON_FIELD",
                                                   "icon" );
+    oFC->headingfield = CPLGetConfigOption( "LIBKML_HEADING_FIELD", "heading");
+    oFC->tiltfield = CPLGetConfigOption( "LIBKML_TILT_FIELD", "tilt");
+    oFC->rollfield = CPLGetConfigOption( "LIBKML_ROLL_FIELD", "roll");
+    oFC->snippetfield = CPLGetConfigOption( "LIBKML_SNIPPET_FIELD", "snippet");
+}
+
+/************************************************************************/
+/*                 kmlAltitudeModeFromString()                          */
+/************************************************************************/
+
+int kmlAltitudeModeFromString(const char* pszAltitudeMode,
+                              int& isGX)
+{
+    isGX = FALSE;
+    int iAltitudeMode = kmldom::ALTITUDEMODE_CLAMPTOGROUND;
+
+    if ( EQUAL ( pszAltitudeMode, "clampToGround" ) )
+        iAltitudeMode = kmldom::ALTITUDEMODE_CLAMPTOGROUND;
+
+    else if ( EQUAL ( pszAltitudeMode, "relativeToGround" ) )
+        iAltitudeMode = kmldom::ALTITUDEMODE_RELATIVETOGROUND;
+
+    else if ( EQUAL ( pszAltitudeMode, "absolute" ) )
+        iAltitudeMode = kmldom::ALTITUDEMODE_ABSOLUTE;
+
+    else if ( EQUAL ( pszAltitudeMode, "relativeToSeaFloor" ) ) {
+        iAltitudeMode =
+            kmldom::GX_ALTITUDEMODE_RELATIVETOSEAFLOOR;
+        isGX = TRUE;
+    }
+
+    else if ( EQUAL ( pszAltitudeMode, "clampToSeaFloor" ) ) {
+        iAltitudeMode =
+            kmldom::GX_ALTITUDEMODE_CLAMPTOSEAFLOOR;
+        isGX = TRUE;
+    }
+    else
+    {
+        CPLError(CE_Warning, CPLE_NotSupported,
+                 "Unrecognized value for altitudeMode: %s",
+                 pszAltitudeMode);
+    }
+
+    return iAltitudeMode;
 }

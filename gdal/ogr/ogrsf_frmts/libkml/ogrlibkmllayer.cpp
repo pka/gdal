@@ -48,10 +48,46 @@ using kmlengine::Bbox;
 using kmldom::ExtendedDataPtr;
 using kmldom::SchemaDataPtr;
 using kmldom::DataPtr;
+using kmldom::CameraPtr;
+using kmldom::LookAtPtr;
+using kmldom::RegionPtr;
+using kmldom::LatLonAltBoxPtr;
+using kmldom::LodPtr;
+using kmldom::ScreenOverlayPtr;
+using kmldom::IconPtr;
 
 #include "ogrlibkmlfeature.h"
 #include "ogrlibkmlfield.h"
 #include "ogrlibkmlstyle.h"
+
+/************************************************************************/
+/*                    OGRLIBKMLGetSanitizedNCName()                     */
+/************************************************************************/
+
+static CPLString OGRLIBKMLGetSanitizedNCName(const char* pszName)
+{
+    CPLString osName(pszName);
+    /* (Approximate) validation rules for a valic NCName */
+    for(size_t i = 0; i < osName.size(); i++)
+    {
+        char ch = osName[i];
+        if( (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z') )
+        {
+            /* ok */
+        }
+        else if ( i > 0 && (ch == '-' || ch == '.' || (ch >= '0' && ch <= '9')) )
+        {
+            /* ok */
+        }
+        else if ( ch > 127 )
+        {
+            /* ok : this is an approximation */
+        }
+        else
+            osName[i] = '_';
+    }
+    return osName;
+}
 
 /******************************************************************************
  OGRLIBKMLLayer constructor
@@ -106,6 +142,19 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
     /***** store the layers container *****/
 
     m_poKmlLayer = poKmlContainer;
+
+    /***** related to Region *****/
+
+    m_bWriteRegion = FALSE;
+    m_bRegionBoundsAuto = FALSE;
+    m_dfRegionMinLodPixels = 0;
+    m_dfRegionMaxLodPixels = -1;
+    m_dfRegionMinFadeExtent = 0;
+    m_dfRegionMaxFadeExtent = 0;
+    m_dfRegionMinX = 200;
+    m_dfRegionMinY = 200;
+    m_dfRegionMaxX = -200;
+    m_dfRegionMaxY = -200;
 
     /***** was the layer created from a DS::Open *****/
 
@@ -201,6 +250,8 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
 
             /***** try to find the correct schema *****/
 
+            int bHasHeading = FALSE, bHasTilt = FALSE, bHasRoll = FALSE;
+            int bHasSnippet = FALSE;
             FeaturePtr poKmlFeature;
 
             /***** find the first placemark *****/
@@ -212,6 +263,40 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
                 poKmlFeature =
                     m_poKmlLayer->get_feature_array_at ( iFeature++ );
 
+                if( poKmlFeature->Type() == kmldom::Type_Placemark )
+                {
+                    PlacemarkPtr poKmlPlacemark = AsPlacemark ( poKmlFeature );
+                    if( !poKmlPlacemark->has_geometry (  ) &&
+                        poKmlPlacemark->has_abstractview (  ) &&
+                        poKmlPlacemark->get_abstractview()->IsA( kmldom::Type_Camera) )
+                    {
+                        const CameraPtr& camera = AsCamera(poKmlPlacemark->get_abstractview());
+                        if( camera->has_heading() && !bHasHeading )
+                        {
+                            bHasHeading = TRUE;
+                            OGRFieldDefn oOgrField ( oFC.headingfield, OFTReal );
+                            m_poOgrFeatureDefn->AddFieldDefn ( &oOgrField );
+                        }
+                        if( camera->has_tilt() && !bHasTilt )
+                        {
+                            bHasTilt = TRUE;
+                            OGRFieldDefn oOgrField ( oFC.tiltfield, OFTReal );
+                            m_poOgrFeatureDefn->AddFieldDefn ( &oOgrField );
+                        }
+                        if( camera->has_roll() && !bHasRoll )
+                        {
+                            bHasRoll = TRUE;
+                            OGRFieldDefn oOgrField ( oFC.rollfield, OFTReal );
+                            m_poOgrFeatureDefn->AddFieldDefn ( &oOgrField );
+                        }
+                    }
+                }
+                if( !bHasSnippet && poKmlFeature->has_snippet() )
+                {
+                    bHasSnippet = TRUE;
+                    OGRFieldDefn oOgrField ( oFC.snippetfield, OFTString );
+                    m_poOgrFeatureDefn->AddFieldDefn ( &oOgrField );
+                }
             } while ( poKmlFeature->Type (  ) != kmldom::Type_Placemark );
 
             if ( iFeature <= nFeatures && poKmlFeature &&
@@ -288,7 +373,7 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
 
         /***** set the id on the new schema *****/
 
-        std::string oKmlSchemaID = m_pszName;
+        std::string oKmlSchemaID = OGRLIBKMLGetSanitizedNCName(m_pszName);
         oKmlSchemaID.append ( ".schema" );
         m_poKmlSchema->set_id ( oKmlSchemaID );
     }
@@ -428,6 +513,17 @@ OGRErr OGRLIBKMLLayer::CreateFeature (
     if ( !bUpdate )
         return OGRERR_UNSUPPORTED_OPERATION;
 
+    if( m_bRegionBoundsAuto && poOgrFeat->GetGeometryRef() != NULL &&
+        !(poOgrFeat->GetGeometryRef()->IsEmpty()) )
+    {
+        OGREnvelope sEnvelope;
+        poOgrFeat->GetGeometryRef()->getEnvelope(&sEnvelope);
+        m_dfRegionMinX = MIN(m_dfRegionMinX, sEnvelope.MinX);
+        m_dfRegionMinY = MIN(m_dfRegionMinY, sEnvelope.MinY);
+        m_dfRegionMaxX = MAX(m_dfRegionMaxX, sEnvelope.MaxX);
+        m_dfRegionMaxY = MAX(m_dfRegionMaxY, sEnvelope.MaxY);
+    }
+
     PlacemarkPtr poKmlPlacemark =
         feat2kml ( m_poOgrDS, this, poOgrFeat, m_poOgrDS->GetKmlFactory (  ) );
 
@@ -436,6 +532,10 @@ OGRErr OGRLIBKMLLayer::CreateFeature (
     /***** update the layer class count of features  *****/
 
     nFeatures++;
+    
+    const char* pszId = CPLSPrintf("%s.%d",
+                    OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), nFeatures);
+    poKmlPlacemark->set_id(pszId);
     
     /***** mark the layer as updated *****/
 
@@ -553,7 +653,13 @@ OGRErr OGRLIBKMLLayer::CreateField (
 
     SimpleFieldPtr poKmlSimpleField = NULL;
 
-    if ( (poKmlSimpleField =
+    struct fieldconfig oFC;
+    get_fieldconfig( &oFC );
+
+    if ( strcmp(poField->GetNameRef(), oFC.headingfield) != 0 &&
+         strcmp(poField->GetNameRef(), oFC.tiltfield) != 0 &&
+         strcmp(poField->GetNameRef(), oFC.rollfield) != 0 &&
+         (poKmlSimpleField =
          FieldDef2kml ( poField, m_poOgrDS->GetKmlFactory (  ) )) != NULL )
         m_poKmlSchema->add_simplefield ( poKmlSimpleField );
 
@@ -730,4 +836,269 @@ CPLString OGRLIBKMLLayer::LaunderFieldNames(CPLString osName)
             osLaunderedName += "_";
     }
     return osLaunderedName;
+}
+
+/************************************************************************/
+/*                            SetLookAt()                               */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetLookAt( const char* pszLookatLongitude,
+                                const char* pszLookatLatitude,
+                                const char* pszLookatAltitude,
+                                const char* pszLookatHeading,
+                                const char* pszLookatTilt,
+                                const char* pszLookatRange,
+                                const char* pszLookatAltitudeMode )
+{
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+    LookAtPtr lookAt = poKmlFactory->CreateLookAt();
+    lookAt->set_latitude(CPLAtof(pszLookatLatitude));
+    lookAt->set_longitude(CPLAtof(pszLookatLongitude));
+    if( pszLookatAltitude != NULL )
+        lookAt->set_altitude(CPLAtof(pszLookatAltitude));
+    if( pszLookatHeading != NULL )
+        lookAt->set_heading(CPLAtof(pszLookatHeading));
+    if( pszLookatTilt != NULL )
+    {
+        double dfTilt = CPLAtof(pszLookatTilt);
+        if( dfTilt >= 0 && dfTilt <= 90 )
+            lookAt->set_tilt(dfTilt);
+        else
+            CPLError(CE_Warning, CPLE_AppDefined, "Invalid value for tilt: %s",
+                     pszLookatTilt);
+    }
+    lookAt->set_range(CPLAtof(pszLookatRange));
+    if( pszLookatAltitudeMode != NULL )
+    {
+        int isGX = FALSE;
+        int iAltitudeMode = kmlAltitudeModeFromString(pszLookatAltitudeMode, isGX);
+        if( iAltitudeMode != kmldom::ALTITUDEMODE_CLAMPTOGROUND &&
+            pszLookatAltitude == NULL )
+        {
+            CPLError(CE_Warning, CPLE_AppDefined, "Lookat altitude should be present for altitudeMode = %s",
+                     pszLookatAltitudeMode);
+        }
+        else if( isGX )
+            lookAt->set_gx_altitudemode(iAltitudeMode);
+        else
+            lookAt->set_altitudemode(iAltitudeMode);
+    }
+
+    m_poKmlLayer->set_abstractview(lookAt);
+}
+
+/************************************************************************/
+/*                            SetCamera()                               */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetCamera( const char* pszCameraLongitude,
+                                const char* pszCameraLatitude,
+                                const char* pszCameraAltitude,
+                                const char* pszCameraHeading,
+                                const char* pszCameraTilt,
+                                const char* pszCameraRoll,
+                                const char* pszCameraAltitudeMode )
+{
+    int isGX = FALSE;
+    int iAltitudeMode = kmlAltitudeModeFromString(pszCameraAltitudeMode, isGX);
+    if( isGX == FALSE && iAltitudeMode == kmldom::ALTITUDEMODE_CLAMPTOGROUND )
+    {
+        CPLError(CE_Warning, CPLE_AppDefined, "Camera altitudeMode should be different from %s",
+                    pszCameraAltitudeMode);
+        return;
+    }
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+    CameraPtr camera = poKmlFactory->CreateCamera();
+    camera->set_latitude(CPLAtof(pszCameraLatitude));
+    camera->set_longitude(CPLAtof(pszCameraLongitude));
+    camera->set_altitude(CPLAtof(pszCameraAltitude));
+    if( pszCameraHeading != NULL )
+        camera->set_heading(CPLAtof(pszCameraHeading));
+    if( pszCameraTilt != NULL )
+    {
+        double dfTilt = CPLAtof(pszCameraTilt);
+        if( dfTilt >= 0 && dfTilt <= 90 )
+            camera->set_tilt(dfTilt);
+        else
+            CPLError(CE_Warning, CPLE_AppDefined, "Invalid value for tilt: %s",
+                     pszCameraTilt);
+    }
+    if( pszCameraRoll != NULL )
+        camera->set_roll(CPLAtof(pszCameraRoll));
+    if( isGX )
+        camera->set_gx_altitudemode(iAltitudeMode);
+    else
+        camera->set_altitudemode(iAltitudeMode);
+
+    m_poKmlLayer->set_abstractview(camera);
+}
+
+/************************************************************************/
+/*                         SetWriteRegion()                             */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetWriteRegion(double dfMinLodPixels,
+                                    double dfMaxLodPixels,
+                                    double dfMinFadeExtent,
+                                    double dfMaxFadeExtent)
+{
+    m_bWriteRegion = TRUE;
+    m_bRegionBoundsAuto = TRUE;
+    m_dfRegionMinLodPixels = dfMinLodPixels;
+    m_dfRegionMaxLodPixels = dfMaxLodPixels;
+    m_dfRegionMinFadeExtent = dfMinFadeExtent;
+    m_dfRegionMaxFadeExtent = dfMaxFadeExtent;
+}
+
+/************************************************************************/
+/*                          SetRegionBounds()                           */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetRegionBounds(double dfMinX, double dfMinY,
+                                     double dfMaxX, double dfMaxY)
+{
+    m_bRegionBoundsAuto = FALSE;
+    m_dfRegionMinX = dfMinX;
+    m_dfRegionMinY = dfMinY;
+    m_dfRegionMaxX = dfMaxX;
+    m_dfRegionMaxY = dfMaxY;
+}
+
+/************************************************************************/
+/*                            Finalize()                                */
+/************************************************************************/
+
+void OGRLIBKMLLayer::Finalize()
+{
+    if( m_bWriteRegion && m_dfRegionMinX < m_dfRegionMaxX )
+    {
+        KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+        RegionPtr region = poKmlFactory->CreateRegion();
+
+        LatLonAltBoxPtr box = poKmlFactory->CreateLatLonAltBox();
+        box->set_west(m_dfRegionMinX);
+        box->set_east(m_dfRegionMaxX);
+        box->set_south(m_dfRegionMinY);
+        box->set_north(m_dfRegionMaxY);
+        region->set_latlonaltbox(box);
+
+        LodPtr lod = poKmlFactory->CreateLod();
+        lod->set_minlodpixels(m_dfRegionMinLodPixels);
+        lod->set_maxlodpixels(m_dfRegionMaxLodPixels);
+        if( (m_dfRegionMinFadeExtent != 0 || m_dfRegionMaxFadeExtent != 0) &&
+            m_dfRegionMinFadeExtent + m_dfRegionMaxFadeExtent <
+                m_dfRegionMaxLodPixels - m_dfRegionMinLodPixels )
+        {
+            lod->set_minfadeextent(m_dfRegionMinFadeExtent);
+            lod->set_maxfadeextent(m_dfRegionMaxFadeExtent);
+        }
+
+        region->set_lod(lod);
+        m_poKmlLayer->set_region(region);
+    }
+}
+
+/************************************************************************/
+/*                             LIBKMLGetUnits()                         */
+/************************************************************************/
+
+static int LIBKMLGetUnits(const char* pszUnits)
+{
+    if( EQUAL(pszUnits, "fraction") )
+        return kmldom::UNITS_FRACTION;
+    if( EQUAL(pszUnits, "pixels") )
+        return  kmldom::UNITS_PIXELS;
+    if( EQUAL(pszUnits, "insetPixels") )
+        return  kmldom::UNITS_INSETPIXELS;
+    return  kmldom::UNITS_FRACTION;
+}
+
+/************************************************************************/
+/*                         LIBKMLSetVec2()                              */
+/************************************************************************/
+
+static void LIBKMLSetVec2(kmldom::Vec2Ptr vec2, const char* pszX, const char* pszY,
+                    const char* pszXUnits, const char* pszYUnits)
+{
+    double dfX = CPLAtof(pszX); 
+    double dfY = CPLAtof(pszY);
+    vec2->set_x(dfX);
+    vec2->set_y(dfY);
+    if( dfX <= 1 && dfY <= 1 )
+    {
+        if( pszXUnits == NULL ) pszXUnits = "fraction";
+        if( pszYUnits == NULL ) pszYUnits = "fraction";
+    }
+    else
+    {
+        if( pszXUnits == NULL ) pszXUnits = "pixels";
+        if( pszYUnits == NULL ) pszYUnits = "pixels";
+    }
+    vec2->set_xunits(LIBKMLGetUnits(pszXUnits));
+    vec2->set_yunits(LIBKMLGetUnits(pszYUnits));
+}
+
+/************************************************************************/
+/*                         SetScreenOverlay()                           */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetScreenOverlay(const char* pszSOHref,
+                                      const char* pszSOName,
+                                      const char* pszSODescription,
+                                      const char* pszSOOverlayX,
+                                      const char* pszSOOverlayY,
+                                      const char* pszSOOverlayXUnits,
+                                      const char* pszSOOverlayYUnits,
+                                      const char* pszSOScreenX,
+                                      const char* pszSOScreenY,
+                                      const char* pszSOScreenXUnits,
+                                      const char* pszSOScreenYUnits,
+                                      const char* pszSOSizeX,
+                                      const char* pszSOSizeY,
+                                      const char* pszSOSizeXUnits,
+                                      const char* pszSOSizeYUnits)
+{
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+    ScreenOverlayPtr so = poKmlFactory->CreateScreenOverlay();
+
+    if( pszSOName != NULL )
+        so->set_name(pszSOName);
+    if( pszSODescription != NULL )
+        so->set_description(pszSODescription);
+
+    IconPtr icon = poKmlFactory->CreateIcon();
+    icon->set_href(pszSOHref);
+    so->set_icon(icon);
+
+    if( pszSOOverlayX != NULL && pszSOOverlayY != NULL )
+    {
+        kmldom::OverlayXYPtr overlayxy = poKmlFactory->CreateOverlayXY();
+        LIBKMLSetVec2(overlayxy, pszSOOverlayX, pszSOOverlayY,
+                      pszSOOverlayXUnits, pszSOOverlayYUnits);
+        so->set_overlayxy(overlayxy);
+    }
+
+    if( pszSOScreenX != NULL && pszSOScreenY != NULL )
+    {
+        kmldom::ScreenXYPtr screenxy = poKmlFactory->CreateScreenXY();
+        LIBKMLSetVec2(screenxy, pszSOScreenX, pszSOScreenY,
+                      pszSOScreenXUnits, pszSOScreenYUnits);
+        so->set_screenxy(screenxy);
+    }
+    else
+    {
+        kmldom::ScreenXYPtr screenxy = poKmlFactory->CreateScreenXY();
+        LIBKMLSetVec2(screenxy, "0.05", "0.05", NULL, NULL);
+        so->set_screenxy(screenxy);
+    }
+
+    if( pszSOSizeX != NULL && pszSOSizeY != NULL )
+    {
+        kmldom::SizePtr sizexy = poKmlFactory->CreateSize();
+        LIBKMLSetVec2(sizexy, pszSOSizeX, pszSOSizeY,
+                      pszSOSizeXUnits, pszSOSizeYUnits);
+        so->set_size(sizexy);
+    }
+
+    m_poKmlLayer->add_feature(so);
 }

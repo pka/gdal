@@ -30,7 +30,7 @@
   <p>
     Libkml from Google provides reading services for any valid KML file.
     However, please be advised that some KML facilities do not map into the
-    Simple Features specification ogr uses as its internal structure.
+    Simple Features specification OGR uses as its internal structure.
     Therefore, a best effort will be made by the driver to understand the
     content of a KML file read by libkml into ogr, but your mileage may vary.
     Please try a few KML files as samples to get a sense of what is understood.
@@ -49,7 +49,7 @@
   
   <p>
     By default on directory and kmz datasources, an index file of all the
-    layers will be read from or written to doc.kml. It conatains a
+    layers will be read from or written to doc.kml. It contains a
     <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#networklink">
     &lt;NetworkLink&gt;</a> to each layer file in the datasource. This feature
     can be turned off by setting the enviroment variable LIBKML_USE_DOC.KML to
@@ -69,6 +69,28 @@
     can translate into KML.
   </p>
   
+  <h3>Datasource creation options</h3>
+
+  <p>
+    Starting with OGR 2.0, the following datasource creation options can be used to generate a
+    <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#atomauthor">
+    &lt;atom:Author&gt;</a> element at the top Document level.
+    <ul>
+        <li><b>AUTHOR_NAME</b></li>
+        <li><b>AUTHOR_URI</b></li>
+        <li><b>AUTHOR_EMAIL</b></li>
+    </ul>
+  </p>
+  <p>
+    The href of an <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#atomlink">
+    &lt;atom:link&gt;</a> element at the top Document level can be specified with the LINK creation option.
+  </p>
+  <p>
+    The <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#phonenumber">
+    &lt;phoneNumber&gt;</a> element at the top Document level can be specified with the PHONENUMBER creation option.
+    The value must follow the syntax of <a href="http://tools.ietf.org/html/rfc3966">IETF RFC 3966</a>.
+  </p>
+ 
   <h2>Layer</h2>
   
   <p>
@@ -98,7 +120,75 @@
     &lt;Schema&gt;</a> is supported for .kml files , .kmz files, and
     directorys.
   </p>
- 
+
+  <h3>Layer creation options</h3>
+
+  <p>
+    Starting with OGR 2.0, the following layer creation options can be used to generate a
+    <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#lookat">
+    &lt;LookAt&gt;</a> element at the layer level.
+    <ul>
+        <li><b>LOOKAT_LONGITUDE</b> (required)</li>
+        <li><b>LOOKAT_LATITUDE</b> (required)</li>
+        <li><b>LOOKAT_RANGE</b> (required)</li>
+        <li><b>LOOKAT_HEADING</b></li>
+        <li><b>LOOKAT_TILT</b></li>
+        <li><b>LOOKAT_ALTITUDE</b></li>
+        <li><b>LOOKAT_ALTITUDEMODE</b></li>
+    </ul>
+  </p>
+
+  <p>Alternatively, a <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#camera">
+    &lt;Camera&gt;</a> element can be generated.
+    <ul>
+        <li><b>CAMERA_LONGITUDE</b> (required)</li>
+        <li><b>CAMERA_LATITUDE</b> (required)</li>
+        <li><b>CAMERA_ALTITUDE</b> (required)</li>
+        <li><b>CAMERA_ALTITUDEMODE</b> (required)</li>
+        <li><b>CAMERA_HEADING</b></li>
+        <li><b>CAMERA_TILT</b></li>
+        <li><b>CAMERA_ROLL</b></li>
+    </ul>
+  </p>
+
+  <p>A <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#region">
+    &lt;Region&gt;</a> element can be generated to control when objects of the layer are visible or not.
+    If REGION_XMIN, REGION_YMIN, REGION_XMAX and REGION_YMAX, the region coordinates are determined from
+    the spatial extent of the features being written in the layer.
+    <ul>
+        <li><b>ADD_REGION=YES/NO</b> : defaults to NO</li>
+        <li><b>REGION_XMIN</b> (optional) : defines the west coordinate of the region.</li>
+        <li><b>REGION_YMIN</b> (optional) : defines the south coordinate of the region.</li>
+        <li><b>REGION_XMAX</b> (optional) : defines the east coordinate of the region.</li>
+        <li><b>REGION_YMAX</b> (optional) : defines the north coordinate of the region.</li>
+        <li><b>REGION_MIN_LOD_PIXELS</b> (optional) : minimum size in pixels of the region so that it is displayed. Defaults to 256.</li>
+        <li><b>REGION_MAX_LOD_PIXELS</b> (optional) : maximum size in pixels of the region so that it is displayed. Defaults to -1 (infinite).</li>
+        <li><b>REGION_MIN_FADE_EXTENT</b> (optional) : distance over which the geometry fades, from fully opaque to fully transparent. Defaults to 0.</li>
+        <li><b>REGION_MAX_FADE_EXTENT</b> (optional) : distance over which the geometry fades, from fully transparent to fully opaque. Defaults to 0.</li>
+    </ul>
+  </p>
+
+  <p>A <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#screenoverlay">
+    &lt;ScreenOverlay&gt;</a> element can be added to display a logo, a legend, etc...
+    <ul>
+        <li><b>SO_HREF</b> (required) : URL of the image to display.</li>
+        <li><b>SO_NAME</b> (optional)</li>
+        <li><b>SO_DESCRIPTION</b> (optional)</li>
+        <li><b>SO_OVERLAY_X</b> (optional)</li>
+        <li><b>SO_OVERLAY_Y</b> (optional)</li>
+        <li><b>SO_OVERLAY_XUNITS</b> (optional)</li>
+        <li><b>SO_OVERLAY_YUNITS</b> (optional)</li>
+        <li><b>SO_SCREEN_X</b> (optional). Defaults to 0.05</li>
+        <li><b>SO_SCREEN_Y</b> (optional). Defaults to 0.05</li>
+        <li><b>SO_SCREEN_XUNITS</b> (optional). Defaults to Fraction</li>
+        <li><b>SO_SCREEN_YUNITS</b> (optional). Defaults to Fraction</li>
+        <li><b>SO_SIZE_X</b> (optional)</li>
+        <li><b>SO_SIZE_Y</b> (optional)</li>
+        <li><b>SO_SIZE_XUNITS</b> (optional)</li>
+        <li><b>SO_SIZE_YUNITS</b> (optional)</li>
+    </ul>
+  </p>
+
   <h2>Feature</h2>
   
   <p>
@@ -239,6 +329,33 @@
       &lt;drawOrder&gt;</a>. The name of the ogr field can be changed with the
       enviroment variable LIBKML_DRAWORDER_FIELD .
     </dd>
+    <dt>snippet</dt>
+    <dd>This integer field maps to the kml tag 
+      <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#snippet">
+      &lt;snippet&gt;</a>. The name of the ogr field can be changed with the
+      enviroment variable LIBKML_SNIPPET_FIELD .
+    </dd>
+    <dt>heading</dt>
+    <dd>This real field maps to the kml tag 
+      <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#heading">
+      &lt;heading&gt;</a>. The name of the ogr field can be changed with the
+      enviroment variable LIBKML_HEADING_FIELD. This field is present only if a Placemark has
+      a Camera with a heading element.
+    </dd>
+    <dt>tilt</dt>
+    <dd>This real field maps to the kml tag 
+      <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#tilt">
+      &lt;tilt&gt;</a>. The name of the ogr field can be changed with the
+      enviroment variable LIBKML_TILT_FIELD. This field is present only if a Placemark has
+      a Camera with a tilt element.
+    </dd>
+    <dt>roll</dt>
+    <dd>This real field maps to the kml tag 
+      <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#roll">
+      &lt;roll&gt;</a>. The name of the ogr field can be changed with the
+      enviroment variable LIBKML_ROLL_FIELD. This field is present only if a Placemark has
+      a Camera with a roll element.
+    </dd>
     <dt>OGR_STYLE</dt>
     <dd>This string field maps to a features style string, OGR reads this field
       if there is no style string set on the feature.
@@ -253,7 +370,8 @@
     Geometry</a> to KML Geometry is pretty strait forwards with only a couple
     of exceptions. Point to 
     <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#point">
-    &lt;Point&gt;</a>, LineString to
+    &lt;Point&gt;</a> (unless heading and/or tilt and/or roll field names are found, in
+    which case a <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#camera">Camera</a> object will be generated), LineString to
     <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#linestring">
     &lt;LineString&gt;</a>, LinearRing to
     <a href="http://code.google.com/apis/kml/documentation/kmlreference.html#linearring">

@@ -6,7 +6,7 @@ SUBDIRS-yes	:= \
 	mitab ntf gpx rec s57 sdts shape tiger vrt \
 	geoconcept xplane georss gtm dxf pgdump gpsbabel \
 	sua openair pds htf aeronavfaa edigeo svg idrisi \
-	arcgen segukooa segy sxf
+	arcgen segukooa segy sxf openfilegdb
 
 SUBDIRS-$(HAVE_DODS)	+= dods
 SUBDIRS-$(HAVE_DWGDIRECT) += dxfdwg
@@ -36,6 +36,7 @@ SUBDIRS-$(HAVE_FREEXL)  += xls
 SUBDIRS-$(HAVE_EXPAT)   += ods
 SUBDIRS-$(HAVE_EXPAT)   += xlsx
 SUBDIRS-$(CURL_SETTING) += elastic
+SUBDIRS-$(HAVE_SQLITE)	+= gpkg
 SUBDIRS-$(HAVE_SQLITE)	+= osm
 SUBDIRS-$(HAVE_SOSI)	+= sosi
 SUBDIRS-$(CURL_SETTING) += cartodb

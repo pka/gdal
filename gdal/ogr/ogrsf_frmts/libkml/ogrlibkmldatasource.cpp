@@ -96,6 +96,58 @@ OGRLIBKMLDataSource::OGRLIBKMLDataSource ( KmlFactory * poKmlFactory )
 
 }
 
+/************************************************************************/
+/*                          PreProcessInput()                           */
+/************************************************************************/
+
+/* Substitute <snippet> by deprecated <Snippet> since libkml currently */
+/* only supports Snippet but ogckml22.xsd has deprecated it in favor of snippet */
+static void PreProcessInput(std::string& oKml)
+{
+    size_t nPos = 0;
+    while( TRUE )
+    {
+        nPos = oKml.find("<snippet>", nPos);
+        if( nPos == std::string::npos )
+        {
+            break;
+        }
+        oKml[nPos+1] = 'S';
+        nPos = oKml.find("</snippet>", nPos);
+        if( nPos == std::string::npos )
+        {
+            break;
+        }
+        oKml[nPos+2] = 'S';
+    }
+}
+
+/************************************************************************/
+/*                        PostProcessOutput()                           */
+/************************************************************************/
+
+/* Substitute deprecated <Snippet> by <snippet> since libkml currently */
+/* only supports Snippet but ogckml22.xsd has deprecated it in favor of snippet */
+static void PostProcessOutput(std::string& oKml)
+{
+    size_t nPos = 0;
+    while( TRUE )
+    {
+        nPos = oKml.find("<Snippet>", nPos);
+        if( nPos == std::string::npos )
+        {
+            break;
+        }
+        oKml[nPos+1] = 's';
+        nPos = oKml.find("</Snippet>", nPos);
+        if( nPos == std::string::npos )
+        {
+            break;
+        }
+        oKml[nPos+2] = 's';
+    }
+}
+
 /******************************************************************************
  method to write a single file ds .kml at ds destroy
 
@@ -133,6 +185,8 @@ void OGRLIBKMLDataSource::WriteKml (
                 if ( poKmlSchema2 != poKmlSchema )
                     poKmlDocument->add_schema ( poKmlSchema );
             }
+
+            papoLayers[iLayer]->Finalize();
         }
     }
 
@@ -143,6 +197,7 @@ void OGRLIBKMLDataSource::WriteKml (
     else if ( m_poKmlDSContainer ) {
         oKmlOut = kmldom::SerializePretty ( m_poKmlDSContainer );
     }
+    PostProcessOutput(oKmlOut);
 
     if (oKmlOut.size() != 0)
     {
@@ -165,11 +220,21 @@ void OGRLIBKMLDataSource::WriteKml (
 /*                      OGRLIBKMLCreateOGCKml22()                             */
 /******************************************************************************/
 
-static KmlPtr OGRLIBKMLCreateOGCKml22(KmlFactory* poFactory)
+static KmlPtr OGRLIBKMLCreateOGCKml22(KmlFactory* poFactory,
+                                      int bWithAtom = FALSE)
 {
     KmlPtr kml = poFactory->CreateKml (  );
-    const char* kAttrs[] = { "xmlns", "http://www.opengis.net/kml/2.2", NULL };
-    kml->AddUnknownAttributes(Attributes::Create(kAttrs));
+    if( bWithAtom )
+    {
+        const char* kAttrs[] = { "xmlns", "http://www.opengis.net/kml/2.2",
+                                 "xmlns:atom", "http://www.w3.org/2005/Atom", NULL };
+        kml->AddUnknownAttributes(Attributes::Create(kAttrs));
+    }
+    else
+    {
+        const char* kAttrs[] = { "xmlns", "http://www.opengis.net/kml/2.2", NULL };
+        kml->AddUnknownAttributes(Attributes::Create(kAttrs));
+    }
     return kml;
 }
 
@@ -211,7 +276,7 @@ void OGRLIBKMLDataSource::WriteKmz (
         }
         
         std::string oKmlOut = kmldom::SerializePretty ( m_poKmlDocKmlRoot );
-
+        PostProcessOutput(oKmlOut);
 
         if ( CPLCreateFileInZip( hZIP, "doc.kml", NULL ) != CE_None ||
              CPLWriteFileInZip( hZIP, oKmlOut.data(), oKmlOut.size() ) != CE_None )
@@ -240,6 +305,8 @@ void OGRLIBKMLDataSource::WriteKmz (
             }
         }
 
+        papoLayers[iLayer]->Finalize();
+
         /***** if we dont have the layers root *****/
         /***** make it and add the container    *****/
 
@@ -253,6 +320,7 @@ void OGRLIBKMLDataSource::WriteKmz (
         }
 
         std::string oKmlOut = kmldom::SerializePretty ( poKmlKml );
+        PostProcessOutput(oKmlOut);
 
         if ( CPLCreateFileInZip( hZIP, papoLayers[iLayer]->GetFileName (  ), NULL ) != CE_None ||
              CPLWriteFileInZip( hZIP, oKmlOut.data(), oKmlOut.size() ) != CE_None )
@@ -270,6 +338,7 @@ void OGRLIBKMLDataSource::WriteKmz (
 
         poKmlKml->set_feature ( m_poKmlStyleKml );
         std::string oKmlOut = kmldom::SerializePretty ( poKmlKml );
+        PostProcessOutput(oKmlOut);
 
         if ( CPLCreateFileInZip( hZIP, "style/style.kml", NULL ) != CE_None ||
              CPLWriteFileInZip( hZIP, oKmlOut.data(), oKmlOut.size() ) != CE_None )
@@ -313,6 +382,7 @@ void OGRLIBKMLDataSource::WriteDir (
         }
         
         std::string oKmlOut = kmldom::SerializePretty ( m_poKmlDocKmlRoot );
+        PostProcessOutput(oKmlOut);
 
         const char *pszOutfile = CPLFormFilename ( pszName, "doc.kml", NULL );
 
@@ -347,6 +417,8 @@ void OGRLIBKMLDataSource::WriteDir (
             };
         }
 
+        papoLayers[iLayer]->Finalize();
+
         /***** if we dont have the layers root *****/
         /***** make it and add the container    *****/
 
@@ -360,6 +432,7 @@ void OGRLIBKMLDataSource::WriteDir (
         }
 
         std::string oKmlOut = kmldom::SerializePretty ( poKmlKml );
+        PostProcessOutput(oKmlOut);
 
         const char *pszOutfile = CPLFormFilename ( pszName,
                                                    papoLayers[iLayer]->
@@ -387,6 +460,7 @@ void OGRLIBKMLDataSource::WriteDir (
 
         poKmlKml->set_feature ( m_poKmlStyleKml );
         std::string oKmlOut = kmldom::SerializePretty ( poKmlKml );
+        PostProcessOutput(oKmlOut);
 
         const char *pszOutfile = CPLFormFilename ( pszName,
                                                    "style.kml",
@@ -834,6 +908,7 @@ int OGRLIBKMLDataSource::OpenKml (
             return FALSE;
         }
     }
+    PreProcessInput(oKmlKml);
     VSIFCloseL(fp);
 
     CPLLocaleC  oLocaleForcer;
@@ -1343,6 +1418,32 @@ int OGRLIBKMLDataSource::Open (
     }
 }
 
+/************************************************************************/
+/*                         IsValidPhoneNumber()                         */
+/************************************************************************/
+
+/* Very approximative validation of http://tools.ietf.org/html/rfc3966#page-6 */
+static int IsValidPhoneNumber(const char* pszPhoneNumber)
+{
+    if( strncmp(pszPhoneNumber, "tel:", strlen("tel:")) == 0 )
+        pszPhoneNumber += strlen("tel:");
+    char ch;
+    int bDigitFound = FALSE;
+    if( *pszPhoneNumber == '+' )
+        pszPhoneNumber ++;
+    while( (ch = *pszPhoneNumber) != '\0' )
+    {
+        if( ch >= '0' && ch <= '9' )
+            bDigitFound = TRUE;
+        else if( ch == ';' )
+            break;
+        else if( !(ch == '-' || ch == '.' || ch == '(' || ch == ')') )
+            return FALSE;
+        pszPhoneNumber ++;
+    }
+    return bDigitFound;
+}
+
 /******************************************************************************
  method to create a single file .kml ds
  
@@ -1357,9 +1458,74 @@ int OGRLIBKMLDataSource::CreateKml (
     const char *pszFilename,
     char **papszOptions )
 {
-
-    m_poKmlDSKml = OGRLIBKMLCreateOGCKml22(m_poKmlFactory);
+    const char* pszAuthorName = CSLFetchNameValue(papszOptions, "AUTHOR_NAME");
+    const char* pszAuthorURI = CSLFetchNameValue(papszOptions, "AUTHOR_URI");
+    const char* pszAuthorEmail = CSLFetchNameValue(papszOptions, "AUTHOR_EMAIL");
+    const char* pszLink = CSLFetchNameValue(papszOptions, "LINK");
+    int bWithAtom = pszAuthorName != NULL ||
+                    pszAuthorURI != NULL ||
+                    pszAuthorEmail != NULL ||
+                    pszLink != NULL;
+    
+    m_poKmlDSKml = OGRLIBKMLCreateOGCKml22(m_poKmlFactory, bWithAtom);
     DocumentPtr poKmlDocument = m_poKmlFactory->CreateDocument (  );
+    
+    if( pszAuthorName != NULL || pszAuthorURI != NULL || pszAuthorEmail != NULL )
+    {
+        kmldom::AtomAuthorPtr author = m_poKmlFactory->CreateAtomAuthor();
+        if( pszAuthorName != NULL )
+            author->set_name(pszAuthorName);
+        if( pszAuthorURI != NULL )
+        {
+            /* Ad-hoc validation. The ABNF is horribly complicated : http://tools.ietf.org/search/rfc3987#page-7 */
+            if( strncmp(pszAuthorURI, "http://", strlen("http://")) == 0 ||
+                strncmp(pszAuthorURI, "https://", strlen("https://")) == 0 )
+            {
+                author->set_uri(pszAuthorURI);
+            }
+            else
+            {
+                CPLError(CE_Warning, CPLE_AppDefined, "Invalid IRI for AUTHOR_URI");
+            }
+        }
+        if( pszAuthorEmail != NULL )
+        {
+            const char* pszArobase = strchr(pszAuthorEmail, '@');
+            if( pszArobase != NULL && strchr(pszArobase + 1, '.') != NULL )
+            {
+                author->set_email(pszAuthorEmail);
+            }
+            else
+            {
+                CPLError(CE_Warning, CPLE_AppDefined, "Invalid email for AUTHOR_EMAIL");
+            }
+        }
+        poKmlDocument->set_atomauthor(author);
+    }
+
+    if( pszLink != NULL )
+    {
+        kmldom::AtomLinkPtr link = m_poKmlFactory->CreateAtomLink();
+        link->set_href(pszLink);
+        link->set_rel("related");
+        poKmlDocument->set_atomlink(link);
+    }
+    
+    const char* pszPhoneNumber = CSLFetchNameValue(papszOptions, "PHONENUMBER");
+    if( pszPhoneNumber != NULL )
+    {
+        if( IsValidPhoneNumber(pszPhoneNumber) )
+        {
+            if( strncmp(pszPhoneNumber, "tel:", strlen("tel:")) != 0 )
+                poKmlDocument->set_phonenumber(CPLSPrintf("tel:%s", pszPhoneNumber));
+            else
+                poKmlDocument->set_phonenumber(pszPhoneNumber);
+        }
+        else
+        {
+            CPLError(CE_Warning, CPLE_AppDefined, "Invalid phone number");
+        }
+    }
 
     m_poKmlDSKml->set_feature ( poKmlDocument );
     m_poKmlDSContainer = poKmlDocument;
@@ -1692,7 +1858,7 @@ OGRErr OGRLIBKMLDataSource::DeleteLayer (
 
 ******************************************************************************/
 
-OGRLayer *OGRLIBKMLDataSource::CreateLayerKml (
+OGRLIBKMLLayer *OGRLIBKMLDataSource::CreateLayerKml (
     const char *pszLayerName,
     OGRSpatialReference * poOgrSRS,
     OGRwkbGeometryType eGType,
@@ -1714,7 +1880,7 @@ OGRLayer *OGRLIBKMLDataSource::CreateLayerKml (
 
     poKmlDocument->set_name ( pszLayerName );
 
-    return ( OGRLayer * ) poOgrLayer;
+    return poOgrLayer;
 }
 
 /******************************************************************************
@@ -1729,7 +1895,7 @@ OGRLayer *OGRLIBKMLDataSource::CreateLayerKml (
 
 ******************************************************************************/
 
-OGRLayer *OGRLIBKMLDataSource::CreateLayerKmz (
+OGRLIBKMLLayer *OGRLIBKMLDataSource::CreateLayerKmz (
     const char *pszLayerName,
     OGRSpatialReference * poOgrSRS,
     OGRwkbGeometryType eGType,
@@ -1773,7 +1939,7 @@ OGRLayer *OGRLIBKMLDataSource::CreateLayerKmz (
 
     poKmlDocument->set_name ( pszLayerName );
 
-    return ( OGRLayer * ) poOgrLayer;
+    return poOgrLayer;
 }
 
 /******************************************************************************
@@ -1805,7 +1971,7 @@ OGRLayer *OGRLIBKMLDataSource::CreateLayer (
         return NULL;
     }
 
-    OGRLayer *poOgrLayer = NULL;
+    OGRLIBKMLLayer *poOgrLayer = NULL;
 
     /***** kml DS *****/
 
@@ -1821,8 +1987,110 @@ OGRLayer *OGRLIBKMLDataSource::CreateLayer (
 
     }
 
-
-
+    const char* pszLookatLongitude = CSLFetchNameValue(papszOptions, "LOOKAT_LONGITUDE");
+    const char* pszLookatLatitude = CSLFetchNameValue(papszOptions, "LOOKAT_LATITUDE");
+    const char* pszLookatAltitude = CSLFetchNameValue(papszOptions, "LOOKAT_ALTITUDE");
+    const char* pszLookatHeading = CSLFetchNameValue(papszOptions, "LOOKAT_HEADING");
+    const char* pszLookatTilt = CSLFetchNameValue(papszOptions, "LOOKAT_TILT");
+    const char* pszLookatRange = CSLFetchNameValue(papszOptions, "LOOKAT_RANGE");
+    const char* pszLookatAltitudeMode = CSLFetchNameValue(papszOptions, "LOOKAT_ALTITUDEMODE");
+    if( poOgrLayer != NULL && pszLookatLongitude != NULL && pszLookatLatitude != NULL &&
+        pszLookatRange != NULL )
+    {
+        poOgrLayer->SetLookAt(pszLookatLongitude,
+                              pszLookatLatitude,
+                              pszLookatAltitude,
+                              pszLookatHeading,
+                              pszLookatTilt,
+                              pszLookatRange,
+                              pszLookatAltitudeMode);
+    }
+    else
+    {
+        const char* pszCameraLongitude = CSLFetchNameValue(papszOptions, "CAMERA_LONGITUDE");
+        const char* pszCameraLatitude = CSLFetchNameValue(papszOptions, "CAMERA_LATITUDE");
+        const char* pszCameraAltitude = CSLFetchNameValue(papszOptions, "CAMERA_ALTITUDE");
+        const char* pszCameraHeading = CSLFetchNameValue(papszOptions, "CAMERA_HEADING");
+        const char* pszCameraTilt = CSLFetchNameValue(papszOptions, "CAMERA_TILT");
+        const char* pszCameraRoll = CSLFetchNameValue(papszOptions, "CAMERA_ROLL");
+        const char* pszCameraAltitudeMode = CSLFetchNameValue(papszOptions, "CAMERA_ALTITUDEMODE");
+        if( poOgrLayer != NULL && pszCameraLongitude != NULL && pszCameraLatitude != NULL &&
+            pszCameraAltitude != NULL && pszCameraAltitudeMode != NULL )
+        {
+            poOgrLayer->SetCamera(pszCameraLongitude,
+                                pszCameraLatitude,
+                                pszCameraAltitude,
+                                pszCameraHeading,
+                                pszCameraTilt,
+                                pszCameraRoll,
+                                pszCameraAltitudeMode);
+        }
+    }
+    
+    const char* pszRegionAdd = CSLFetchNameValueDef(papszOptions, "ADD_REGION", "FALSE");
+    const char* pszRegionXMin = CSLFetchNameValue(papszOptions, "REGION_XMIN");
+    const char* pszRegionYMin = CSLFetchNameValue(papszOptions, "REGION_YMIN");
+    const char* pszRegionXMax = CSLFetchNameValue(papszOptions, "REGION_XMAX");
+    const char* pszRegionYMax = CSLFetchNameValue(papszOptions, "REGION_YMAX");
+    const char* pszRegionMinLodPixels =
+        CSLFetchNameValueDef(papszOptions, "REGION_MIN_LOD_PIXELS", "256");
+    const char* pszRegionMaxLodPixels =
+        CSLFetchNameValueDef(papszOptions, "REGION_MAX_LOD_PIXELS", "-1");
+    const char* pszRegionMinFadeExtent =
+        CSLFetchNameValueDef(papszOptions, "REGION_MIN_FADE_EXTENT", "0");
+    const char* pszRegionMaxFadeExtent =
+        CSLFetchNameValueDef(papszOptions, "REGION_MAX_FADE_EXTENT", "0");
+    if( poOgrLayer != NULL && CSLTestBoolean(pszRegionAdd) )
+    {
+        poOgrLayer->SetWriteRegion(CPLAtof(pszRegionMinLodPixels),
+                                   CPLAtof(pszRegionMaxLodPixels),
+                                   CPLAtof(pszRegionMinFadeExtent),
+                                   CPLAtof(pszRegionMaxFadeExtent));
+        if( pszRegionXMin != NULL && pszRegionYMin != NULL &&
+            pszRegionXMax != NULL && pszRegionYMax != NULL )
+        {
+            double xmin = CPLAtof(pszRegionXMin);
+            double ymin = CPLAtof(pszRegionYMin);
+            double xmax = CPLAtof(pszRegionXMax);
+            double ymax = CPLAtof(pszRegionYMax);
+            if( xmin < xmax && ymin < ymax )
+                poOgrLayer->SetRegionBounds(xmin, ymin, xmax, ymax);
+        }
+    }
+    
+    const char* pszSOHref = CSLFetchNameValue(papszOptions, "SO_HREF");
+    const char* pszSOName = CSLFetchNameValue(papszOptions, "SO_NAME");
+    const char* pszSODescription = CSLFetchNameValue(papszOptions, "SO_DESCRIPTION");
+    const char* pszSOOverlayX = CSLFetchNameValue(papszOptions, "SO_OVERLAY_X");
+    const char* pszSOOverlayY = CSLFetchNameValue(papszOptions, "SO_OVERLAY_Y");
+    const char* pszSOOverlayXUnits = CSLFetchNameValue(papszOptions, "SO_OVERLAY_XUNITS");
+    const char* pszSOOverlayYUnits = CSLFetchNameValue(papszOptions, "SO_OVERLAY_YUNITS");
+    const char* pszSOScreenX = CSLFetchNameValue(papszOptions, "SO_SCREEN_X");
+    const char* pszSOScreenY = CSLFetchNameValue(papszOptions, "SO_SCREEN_Y");
+    const char* pszSOScreenXUnits = CSLFetchNameValue(papszOptions, "SO_SCREEN_XUNITS");
+    const char* pszSOScreenYUnits = CSLFetchNameValue(papszOptions, "SO_SCREEN_YUNITS");
+    const char* pszSOSizeX = CSLFetchNameValue(papszOptions, "SO_SIZE_X");
+    const char* pszSOSizeY = CSLFetchNameValue(papszOptions, "SO_SIZE_Y");
+    const char* pszSOSizeXUnits = CSLFetchNameValue(papszOptions, "SO_SIZE_XUNITS");
+    const char* pszSOSizeYUnits = CSLFetchNameValue(papszOptions, "SO_SIZE_YUNITS");
+    if( poOgrLayer != NULL && pszSOHref != NULL )
+    {
+        poOgrLayer->SetScreenOverlay(pszSOHref,
+                                     pszSOName,
+                                     pszSODescription,
+                                     pszSOOverlayX,
+                                     pszSOOverlayY,
+                                     pszSOOverlayXUnits,
+                                     pszSOOverlayYUnits,
+                                     pszSOScreenX,
+                                     pszSOScreenY,
+                                     pszSOScreenXUnits,
+                                     pszSOScreenYUnits,
+                                     pszSOSizeX,
+                                     pszSOSizeY,
+                                     pszSOSizeXUnits,
+                                     pszSOSizeYUnits);
+    }
 
     /***** mark the dataset as updated *****/
 
@@ -1892,12 +2160,15 @@ void OGRLIBKMLDataSource::SetStyleTable2Kml (
 void OGRLIBKMLDataSource::SetStyleTable2Kmz (
     OGRStyleTable * poStyleTable )
 {
+    if( m_poKmlStyleKml != NULL || poStyleTable != NULL )
+    {
+        /***** replace the style document with a new one *****/
 
-    /***** replace the style document with a new one *****/
+        m_poKmlStyleKml = m_poKmlFactory->CreateDocument (  );
+        m_poKmlStyleKml->set_id ( "styleId" );
 
-    m_poKmlStyleKml = m_poKmlFactory->CreateDocument (  );
-
-    styletable2kml ( poStyleTable, m_poKmlFactory, m_poKmlStyleKml );
+        styletable2kml ( poStyleTable, m_poKmlFactory, m_poKmlStyleKml );
+    }
 
     return;
 }

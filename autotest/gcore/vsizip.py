@@ -31,6 +31,7 @@
 
 import os
 import sys
+import shutil
 
 sys.path.append( '../pymod' )
 
@@ -326,13 +327,120 @@ def vsizip_6():
 
     return 'success'
 
+###############################################################################
+# Test that we use the extented field for UTF-8 filenames (#5361)
 
+def vsizip_7():
+
+    content = gdal.ReadDir("/vsizip/data/cp866_plus_utf8.zip")
+    ok = 0
+    try:
+        exec("if content == [u'\u0430\u0431\u0432\u0433\u0434\u0435', u'\u0436\u0437\u0438\u0439\u043a\u043b']: ok = 1")
+    except:
+        if content == ['\u0430\u0431\u0432\u0433\u0434\u0435', '\u0436\u0437\u0438\u0439\u043a\u043b']:
+            ok = 1
+
+    if ok == 0:
+        gdaltest.post_reason('bad content')
+        print(content)
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Basic test for ZIP64 support (5 GB file that compresses in less than 4 GB)
+
+def vsizip_8():
+
+    if gdal.VSIStatL('/vsizip/vsizip/data/zero.bin.zip.zip/zero.bin.zip').size != 5000 * 1000 * 1000 + 1:
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Basic test for ZIP64 support (5 GB file that is stored)
+
+def vsizip_9():
+
+    if gdal.VSIStatL('/vsizip//vsisparse/data/zero_stored.bin.xml.zip/zero.bin').size != 5000 * 1000 * 1000 + 1:
+        gdaltest.post_reason('fail')
+        return 'fail'
+
+    if gdal.VSIStatL('/vsizip//vsisparse/data/zero_stored.bin.xml.zip/hello.txt').size != 6:
+        gdaltest.post_reason('fail')
+        return 'fail'
+
+    f = gdal.VSIFOpenL('/vsizip//vsisparse/data/zero_stored.bin.xml.zip/zero.bin', 'rb')
+    gdal.VSIFSeekL(f, 5000 * 1000 * 1000, 0)
+    data = gdal.VSIFReadL(1, 1, f)
+    gdal.VSIFCloseL(f)
+    if data.decode('ascii') != '\x03':
+        gdaltest.post_reason('fail')
+        return 'fail'
+
+    f = gdal.VSIFOpenL('/vsizip//vsisparse/data/zero_stored.bin.xml.zip/hello.txt', 'rb')
+    data = gdal.VSIFReadL(1, 6, f)
+    gdal.VSIFCloseL(f)
+    if data.decode('ascii') != 'HELLO\n':
+        print(data)
+        gdaltest.post_reason('fail')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test that we recode filenames in ZIP (#5361)
+
+def vsizip_10():
+
+    gdal.SetConfigOption('CPL_ZIP_ENCODING', 'CP866')
+    content = gdal.ReadDir("/vsizip/data/cp866.zip")
+    gdal.SetConfigOption('CPL_ZIP_ENCODING', None)
+    ok = 0
+    try:
+        exec("if content == [u'\u0430\u0431\u0432\u0433\u0434\u0435', u'\u0436\u0437\u0438\u0439\u043a\u043b']: ok = 1")
+    except:
+        if content == ['\u0430\u0431\u0432\u0433\u0434\u0435', '\u0436\u0437\u0438\u0439\u043a\u043b']:
+            ok = 1
+
+    if ok == 0:
+        gdaltest.post_reason('bad content')
+        print(content)
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test that we don't do anything with ZIP with filenames in UTF-8 already (#5361)
+
+def vsizip_11():
+
+    content = gdal.ReadDir("/vsizip/data/utf8.zip")
+    ok = 0
+    try:
+        exec("if content == [u'\u0430\u0431\u0432\u0433\u0434\u0435', u'\u0436\u0437\u0438\u0439\u043a\u043b']: ok = 1")
+    except:
+        if content == ['\u0430\u0431\u0432\u0433\u0434\u0435', '\u0436\u0437\u0438\u0439\u043a\u043b']:
+            ok = 1
+
+    if ok == 0:
+        gdaltest.post_reason('bad content')
+        print(content)
+        return 'fail'
+
+    return 'success'
+    
 gdaltest_list = [ vsizip_1,
                   vsizip_2,
                   vsizip_3,
                   vsizip_4,
                   vsizip_5,
                   vsizip_6,
+                  vsizip_7,
+                  vsizip_8,
+                  vsizip_9,
+                  vsizip_10,
+                  vsizip_11,
                   ]
 
 

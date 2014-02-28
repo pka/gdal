@@ -141,6 +141,17 @@ def DontUseExceptions(*args):
   """DontUseExceptions()"""
   return _ogr.DontUseExceptions(*args)
 import osr
+class StyleTable(_object):
+    """Proxy of C++ OGRStyleTableShadow class"""
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, StyleTable, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, StyleTable, name)
+    def __init__(self, *args, **kwargs): raise AttributeError("No constructor defined")
+    __repr__ = _swig_repr
+StyleTable_swigregister = _ogr.StyleTable_swigregister
+StyleTable_swigregister(StyleTable)
+
 class Driver(_object):
     """Proxy of C++ OGRDriverShadow class"""
     __swig_setmethods__ = {}
@@ -726,6 +737,25 @@ class DataSource(_object):
 
         """
         return _ogr.DataSource_ReleaseResultSet(self, *args)
+
+    def GetStyleTable(self, *args):
+        """
+        GetStyleTable(self) -> StyleTable
+
+        OGRStyleTableH
+        OGR_DS_GetStyleTable(OGRDataSourceH hDS) 
+        """
+        return _ogr.DataSource_GetStyleTable(self, *args)
+
+    def SetStyleTable(self, *args):
+        """
+        SetStyleTable(self, StyleTable table)
+
+        void
+        OGR_DS_SetStyleTable(OGRDataSourceH hDS, OGRStyleTableH hStyleTable)
+
+        """
+        return _ogr.DataSource_SetStyleTable(self, *args)
 
     def Destroy(self):
       "Once called, self has effectively been destroyed.  Do not access. For backwards compatiblity only"
@@ -1930,6 +1960,24 @@ class Layer(_object):
             GDALProgressFunc callback = None, void callback_data = None) -> OGRErr
         """
         return _ogr.Layer_Erase(self, *args, **kwargs)
+
+    def GetStyleTable(self, *args):
+        """
+        GetStyleTable(self) -> StyleTable
+
+        OGRStyleTableH
+        OGR_L_GetStyleTable(OGRLayerH hLayer) 
+        """
+        return _ogr.Layer_GetStyleTable(self, *args)
+
+    def SetStyleTable(self, *args):
+        """
+        SetStyleTable(self, StyleTable table)
+
+        void
+        OGR_L_SetStyleTable(OGRLayerH hLayer, OGRStyleTableH hStyleTable) 
+        """
+        return _ogr.Layer_SetStyleTable(self, *args)
 
     def Reference(self):
       "For backwards compatibility only."

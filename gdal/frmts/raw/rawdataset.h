@@ -102,12 +102,15 @@ protected:
 
     CPLErr      AccessBlock( vsi_l_offset nBlockOff, int nBlockSize,
                              void * pData );
-    int         IsLineLoaded( int nLineOff, int nLines );
+    int         IsSignificantNumberOfLinesLoaded( int nLineOff, int nLines );
     void        Initialize();
 
     virtual CPLErr  IRasterIO( GDALRWFlag, int, int, int, int,
                               void *, int, int, GDALDataType,
                               int, int );
+
+    int         CanUseDirectIO(int nXOff, int nYOff, int nXSize, int nYSize,
+                               GDALDataType eBufType);
 
 public:
 
@@ -139,6 +142,11 @@ public:
     virtual CPLErr SetCategoryNames( char ** );
 
     virtual CPLErr  FlushCache();
+
+    virtual CPLVirtualMem  *GetVirtualMemAuto( GDALRWFlag eRWFlag,
+                                               int *pnPixelSpace,
+                                               GIntBig *pnLineSpace,
+                                               char **papszOptions );
 
     CPLErr          AccessLine( int iLine );
 

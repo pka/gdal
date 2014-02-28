@@ -101,7 +101,13 @@ struct fieldconfig {
     const char *visibilityfield;
     const char *drawOrderfield;
     const char *iconfield;
+    const char *headingfield;
+    const char *tiltfield;
+    const char *rollfield;
+    const char *snippetfield;
 };
 
 void get_fieldconfig( struct fieldconfig *oFC );
 
+int kmlAltitudeModeFromString(const char* pszAltitudeMode,
+                              int& isGX);

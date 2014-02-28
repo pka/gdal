@@ -76,6 +76,17 @@ class OGRLIBKMLLayer:public OGRLayer
 
     int                       m_bReadGroundOverlay;
 
+    int                       m_bWriteRegion;
+    int                       m_bRegionBoundsAuto;
+    double                    m_dfRegionMinLodPixels;
+    double                    m_dfRegionMaxLodPixels;
+    double                    m_dfRegionMinFadeExtent;
+    double                    m_dfRegionMaxFadeExtent;
+    double                    m_dfRegionMinX;
+    double                    m_dfRegionMinY;
+    double                    m_dfRegionMaxX;
+    double                    m_dfRegionMaxY;
+
   public:
     OGRLIBKMLLayer            ( const char *pszLayerName,
                                 OGRSpatialReference * poSpatialRef,
@@ -117,9 +128,47 @@ class OGRLIBKMLLayer:public OGRLayer
     SchemaPtr                 GetKmlSchema () { return m_poKmlSchema; };
     const char               *GetFileName (  ) { return m_pszFileName; };
 
+    void                      SetLookAt(const char* pszLookatLongitude,
+                                        const char* pszLookatLatitude,
+                                        const char* pszLookatAltitude,
+                                        const char* pszLookatHeading,
+                                        const char* pszLookatTilt,
+                                        const char* pszLookatRange,
+                                        const char* pszLookatAltitudeMode);
+    void                      SetCamera(const char* pszCameraLongitude,
+                                        const char* pszCameraLatitude,
+                                        const char* pszCameraAltitude,
+                                        const char* pszCameraHeading,
+                                        const char* pszCameraTilt,
+                                        const char* pszCameraRoll,
+                                        const char* pszCameraAltitudeMode);
 
     static CPLString          LaunderFieldNames(CPLString osName);
+    
+    void                      SetWriteRegion(double dfMinLodPixels,
+                                             double dfMaxLodPixels,
+                                             double dfMinFadeExtent,
+                                             double dfMaxFadeExtent);
+    void                      SetRegionBounds(double dfMinX, double dfMinY,
+                                              double dfMaxX, double dfMaxY);
 
+    void                      SetScreenOverlay(const char* pszSOHref,
+                                               const char* pszSOName,
+                                               const char* pszSODescription,
+                                               const char* pszSOOverlayX,
+                                               const char* pszSOOverlayY,
+                                               const char* pszSOOverlayXUnits,
+                                               const char* pszSOOverlayYUnits,
+                                               const char* pszSOScreenX,
+                                               const char* pszSOScreenY,
+                                               const char* pszSOScreenXUnits,
+                                               const char* pszSOScreenYUnits,
+                                               const char* pszSOSizeX,
+                                               const char* pszSOSizeY,
+                                               const char* pszSOSizeXUnits,
+                                               const char* pszSOSizeYUnits);
+
+    void                      Finalize();
 };
 
 /******************************************************************************
@@ -240,11 +289,11 @@ class OGRLIBKMLDataSource:public OGRDataSource
 
     /***** methods to create layers on various datasource types *****/
     
-    OGRLayer                 *CreateLayerKml ( const char *pszLayerName,
+    OGRLIBKMLLayer           *CreateLayerKml ( const char *pszLayerName,
                                                OGRSpatialReference * poOgrSRS,
                                                OGRwkbGeometryType eGType,
                                                char **papszOptions );
-    OGRLayer                 *CreateLayerKmz ( const char *pszLayerName,
+    OGRLIBKMLLayer           *CreateLayerKmz ( const char *pszLayerName,
                                                OGRSpatialReference * poOgrSRS,
                                                OGRwkbGeometryType eGType,
                                                char **papszOptions );
