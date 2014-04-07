@@ -6,6 +6,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2010, Brian Case
+ * Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -41,6 +42,7 @@ using kmldom::DocumentPtr;
 using kmldom::ContainerPtr;
 using kmldom::ElementPtr;
 using kmldom::SchemaPtr;
+using kmldom::UpdatePtr;
 using kmlengine::KmzFile;
 using kmlengine::KmzFilePtr;
 
@@ -48,6 +50,8 @@ using kmlengine::KmlFile;
 using kmlengine::KmlFilePtr;
 
 class OGRLIBKMLDataSource;
+
+CPLString OGRLIBKMLGetSanitizedNCName(const char* pszName);
 
 /******************************************************************************
   layer class
@@ -65,7 +69,7 @@ class OGRLIBKMLLayer:public OGRLayer
 
     ContainerPtr              m_poKmlLayer;
     ElementPtr                m_poKmlLayerRoot;
-    //KmlFile                  *m_poKmlKmlfile;
+    UpdatePtr                 m_poKmlUpdate;
 
     DocumentPtr               m_poKmlDocument;
     //OGRStyleTable            *m_poStyleTable;
@@ -75,6 +79,7 @@ class OGRLIBKMLLayer:public OGRLayer
     OGRSpatialReference      *m_poOgrSRS;
 
     int                       m_bReadGroundOverlay;
+    int                       m_bUseSimpleField;
 
     int                       m_bWriteRegion;
     int                       m_bRegionBoundsAuto;
@@ -87,6 +92,11 @@ class OGRLIBKMLLayer:public OGRLayer
     double                    m_dfRegionMaxX;
     double                    m_dfRegionMaxY;
 
+    CPLString                 osListStyleType;
+    CPLString                 osListStyleIconHref;
+    
+    int                       m_bUpdateIsFolder;
+
   public:
     OGRLIBKMLLayer            ( const char *pszLayerName,
                                 OGRSpatialReference * poSpatialRef,
@@ -94,6 +104,7 @@ class OGRLIBKMLLayer:public OGRLayer
                                 OGRLIBKMLDataSource *poOgrDS,
                                 ElementPtr poKmlRoot,
                                 ContainerPtr poKmlContainer,
+                                UpdatePtr poKmlUpdate,
                                 const char *pszFileName,
                                 int bNew,
                                 int bUpdate);
@@ -105,6 +116,8 @@ class OGRLIBKMLLayer:public OGRLayer
     OGRFeatureDefn           *GetLayerDefn (  ) { return m_poOgrFeatureDefn; };
     //OGRErr                    SetAttributeFilter (const char * );
     OGRErr                    CreateFeature ( OGRFeature * poOgrFeat );
+    OGRErr                    SetFeature ( OGRFeature * poOgrFeat );
+    OGRErr                    DeleteFeature( long nFID );
 
     int                       GetFeatureCount ( int bForce = TRUE );
     OGRErr                    GetExtent ( OGREnvelope * psExtent,
@@ -168,7 +181,11 @@ class OGRLIBKMLLayer:public OGRLayer
                                                const char* pszSOSizeXUnits,
                                                const char* pszSOSizeYUnits);
 
-    void                      Finalize();
+    void                      SetListStyle(const char* pszListStyleType,
+                                           const char* pszListStyleIconHref);
+
+    void                      Finalize(DocumentPtr poKmlDocument);
+    void                      SetUpdateIsFolder(int bUpdateIsFolder) { m_bUpdateIsFolder = bUpdateIsFolder; }
 };
 
 /******************************************************************************
@@ -188,11 +205,15 @@ class OGRLIBKMLDataSource:public OGRDataSource
 
     int                       bUpdate;
     int                       bUpdated;
+    CPLString                 osUpdateTargetHref;
+
+    char                    **m_papszOptions;
 
     /***** for kml files *****/
     int                       m_isKml;
     KmlPtr                    m_poKmlDSKml;
     ContainerPtr              m_poKmlDSContainer;
+    UpdatePtr                 m_poKmlUpdate;
 
     /***** for kmz files *****/
 
@@ -212,7 +233,11 @@ class OGRLIBKMLDataSource:public OGRDataSource
     
     /***** style table pointer *****/
     
-    //OGRStyleTable            *m_poStyleTable;
+    void                      SetCommonOptions(ContainerPtr poKmlContainer,
+                                               char** papszOptions);
+
+    void                      ParseDocumentOptions(KmlPtr poKml,
+                                                   DocumentPtr poKmlDocument);
 
   public:
     OGRLIBKMLDataSource       ( KmlFactory *poKmlFactory );

@@ -9,6 +9,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2000, Frank Warmerdam
+ * Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -1829,7 +1830,7 @@ OGRErr OGRPGLayer::RunGetExtentRequest( OGREnvelope *psExtent, int bForce,
     if( ! hResult || PQresultStatus(hResult) != PGRES_TUPLES_OK || PQgetisnull(hResult,0,0) )
     {
         OGRPGClearResult( hResult );
-        CPLDebug("PG","Unable to get extent by PostGIS. Using standard OGRLayer method.");
+        CPLDebug("PG","Unable to get extent by PostGIS.");
         return OGRERR_FAILURE;
     }
 

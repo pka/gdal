@@ -16,6 +16,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2004, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2009-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -292,11 +293,14 @@ void OGRSQLiteLayer::BuildFeatureDefn( const char *pszLayerName,
                 }
             }
             else if ((EQUAL(pszDeclType, "TIMESTAMP") ||
-                      EQUAL(pszDeclType, "DATETIME")) && nColType == SQLITE_TEXT)
+                      EQUAL(pszDeclType, "DATETIME")) &&
+                     (nColType == SQLITE_TEXT || nColType == SQLITE_NULL))
                 eFieldType = OFTDateTime;
-            else if (EQUAL(pszDeclType, "DATE") && nColType == SQLITE_TEXT)
+            else if (EQUAL(pszDeclType, "DATE") &&
+                     (nColType == SQLITE_TEXT || nColType == SQLITE_NULL))
                 eFieldType = OFTDate;
-            else if (EQUAL(pszDeclType, "TIME") && nColType == SQLITE_TEXT)
+            else if (EQUAL(pszDeclType, "TIME") &&
+                     (nColType == SQLITE_TEXT || nColType == SQLITE_NULL))
                 eFieldType = OFTTime;
         }
         else if( nColType == SQLITE_TEXT &&

@@ -6,6 +6,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2010, Brian Case
+ * Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -55,6 +56,9 @@ using kmldom::LatLonAltBoxPtr;
 using kmldom::LodPtr;
 using kmldom::ScreenOverlayPtr;
 using kmldom::IconPtr;
+using kmldom::CreatePtr;
+using kmldom::ChangePtr;
+using kmldom::DeletePtr;
 
 #include "ogrlibkmlfeature.h"
 #include "ogrlibkmlfield.h"
@@ -64,7 +68,7 @@ using kmldom::IconPtr;
 /*                    OGRLIBKMLGetSanitizedNCName()                     */
 /************************************************************************/
 
-static CPLString OGRLIBKMLGetSanitizedNCName(const char* pszName)
+CPLString OGRLIBKMLGetSanitizedNCName(const char* pszName)
 {
     CPLString osName(pszName);
     /* (Approximate) validation rules for a valic NCName */
@@ -97,6 +101,7 @@ static CPLString OGRLIBKMLGetSanitizedNCName(const char* pszName)
                 eGType          the layers geometry type
                 poOgrDS         pointer to the datasource the layer is in
                 poKmlRoot       pointer to the root kml element of the layer
+                poKmlContainer  pointer to the kml container of the layer
                 pszFileName     the filename of the layer
                 bNew            true if its a new layer
                 bUpdate         true if the layer is writeable
@@ -111,6 +116,7 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
                                  OGRLIBKMLDataSource * poOgrDS,
                                  ElementPtr poKmlRoot,
                                  ContainerPtr poKmlContainer,
+                                 UpdatePtr poKmlUpdate,
                                  const char *pszFileName,
                                  int bNew,
                                  int bUpdate )
@@ -122,6 +128,7 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
     nFID = 1;
 
     this->bUpdate = bUpdate;
+    bUpdated = FALSE;
     m_pszName = CPLStrdup ( pszLayerName );
     m_pszFileName = CPLStrdup ( pszFileName );
     m_poOgrDS = poOgrDS;
@@ -142,6 +149,11 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
     /***** store the layers container *****/
 
     m_poKmlLayer = poKmlContainer;
+    
+    /* update container */
+    m_poKmlUpdate = poKmlUpdate;
+
+    m_poKmlSchema = NULL;
 
     /***** related to Region *****/
 
@@ -156,9 +168,13 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
     m_dfRegionMaxX = -200;
     m_dfRegionMaxY = -200;
 
-    /***** was the layer created from a DS::Open *****/
 
     m_bReadGroundOverlay = CSLTestBoolean(CPLGetConfigOption("LIBKML_READ_GROUND_OVERLAY", "YES"));
+    m_bUseSimpleField = CSLTestBoolean(CPLGetConfigOption("LIBKML_USE_SIMPLEFIELD", "YES"));
+    
+    m_bUpdateIsFolder = FALSE;
+
+    /***** was the layer created from a DS::Open *****/
 
     if ( !bNew ) {
 
@@ -232,8 +248,6 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
             ParseStyles ( AsDocument ( m_poKmlLayer ), &m_poStyleTable );
 
         /***** get the schema if the layer is a Document *****/
-
-        m_poKmlSchema = NULL;
 
         if ( m_poKmlLayer->IsA ( kmldom::Type_Document ) ) {
             DocumentPtr poKmlDocument = AsDocument ( m_poKmlLayer );
@@ -364,22 +378,7 @@ OGRLIBKMLLayer::OGRLIBKMLLayer ( const char *pszLayerName,
         /***** mark the layer as updated *****/
 
         bUpdated = TRUE;
-
-        /***** create a new schema *****/
-
-        KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
-
-        m_poKmlSchema = poKmlFactory->CreateSchema (  );
-
-        /***** set the id on the new schema *****/
-
-        std::string oKmlSchemaID = OGRLIBKMLGetSanitizedNCName(m_pszName);
-        oKmlSchemaID.append ( ".schema" );
-        m_poKmlSchema->set_id ( oKmlSchemaID );
     }
-
-
-
 
 }
 
@@ -450,6 +449,9 @@ OGRFeature *OGRLIBKMLLayer::GetNextRawFeature (
 {
     FeaturePtr poKmlFeature;
     OGRFeature *poOgrFeature = NULL;
+    
+    if( m_poKmlLayer == NULL )
+        return NULL;
 
     /***** loop over the kml features to find the next placemark *****/
 
@@ -524,19 +526,132 @@ OGRErr OGRLIBKMLLayer::CreateFeature (
         m_dfRegionMaxY = MAX(m_dfRegionMaxY, sEnvelope.MaxY);
     }
 
-    PlacemarkPtr poKmlPlacemark =
-        feat2kml ( m_poOgrDS, this, poOgrFeat, m_poOgrDS->GetKmlFactory (  ) );
+    FeaturePtr poKmlFeature =
+        feat2kml ( m_poOgrDS, this, poOgrFeat, m_poOgrDS->GetKmlFactory (  ),
+                   m_bUseSimpleField );
 
-    m_poKmlLayer->add_feature ( poKmlPlacemark );
+    if( m_poKmlLayer != NULL )
+        m_poKmlLayer->add_feature ( poKmlFeature );
+    else
+    {
+        CPLAssert( m_poKmlUpdate != NULL );
+        KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+        CreatePtr poCreate = poKmlFactory->CreateCreate();
+        ContainerPtr poContainer;
+        if( m_bUpdateIsFolder )
+            poContainer = poKmlFactory->CreateFolder();
+        else
+            poContainer = poKmlFactory->CreateDocument();
+        poContainer->set_targetid(OGRLIBKMLGetSanitizedNCName(GetName()));
+        poContainer->add_feature ( poKmlFeature );
+        poCreate->add_container(poContainer);
+        m_poKmlUpdate->add_updateoperation(poCreate);
+    }
 
     /***** update the layer class count of features  *****/
 
-    nFeatures++;
+    if( m_poKmlLayer != NULL )
+    {
+        nFeatures++;
+        
+        const char* pszId = CPLSPrintf("%s.%d",
+                        OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), nFeatures);
+        poOgrFeat->SetFID(nFeatures);
+        poKmlFeature->set_id(pszId);
+    }
+    else
+    {
+        if( poOgrFeat->GetFID() < 0 )
+        {
+            static int bAlreadyWarned = FALSE;
+            if( !bAlreadyWarned )
+            {
+                bAlreadyWarned = TRUE;
+                CPLError(CE_Warning, CPLE_AppDefined,
+                         "It is recommanded to define a FID when calling CreateFeature() in a update document");
+            }
+        }
+        else
+        {
+            const char* pszId = CPLSPrintf("%s.%ld",
+                    OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), poOgrFeat->GetFID());
+            poOgrFeat->SetFID(nFeatures);
+            poKmlFeature->set_id(pszId);
+        }
+    }
+
+    /***** mark the layer as updated *****/
+
+    bUpdated = TRUE;
+    m_poOgrDS->Updated (  );
+
+    return OGRERR_NONE;
+}
+
+
+/******************************************************************************
+ method to update a feature to a layer. Only work on a NetworkLinkControl/Update
+
+ Args:          poOgrFeat   pointer to the feature to update
+ 
+ Returns:       OGRERR_NONE, or OGRERR_UNSUPPORTED_OPERATION of the layer is
+                not writeable
+
+******************************************************************************/
+
+OGRErr OGRLIBKMLLayer::SetFeature ( OGRFeature * poOgrFeat )
+{
+    if( !bUpdate || m_poKmlUpdate == NULL )
+        return OGRERR_UNSUPPORTED_OPERATION;
+    if( poOgrFeat->GetFID() == OGRNullFID )
+        return OGRERR_FAILURE;
+
+    FeaturePtr poKmlFeature =
+        feat2kml ( m_poOgrDS, this, poOgrFeat, m_poOgrDS->GetKmlFactory (  ),
+                   m_bUseSimpleField );
+
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+    ChangePtr poChange = poKmlFactory->CreateChange();
+    poChange->add_object(poKmlFeature);
+    m_poKmlUpdate->add_updateoperation(poChange);
     
-    const char* pszId = CPLSPrintf("%s.%d",
-                    OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), nFeatures);
-    poKmlPlacemark->set_id(pszId);
+    const char* pszId = CPLSPrintf("%s.%ld",
+                    OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), poOgrFeat->GetFID());
+    poKmlFeature->set_targetid(pszId);
+
+    /***** mark the layer as updated *****/
+
+    bUpdated = TRUE;
+    m_poOgrDS->Updated (  );
+
+    return OGRERR_NONE;
+}
+
+/******************************************************************************
+ method to delete a feature to a layer. Only work on a NetworkLinkControl/Update
+
+ Args:          nFID   id of the feature to delete
+ 
+ Returns:       OGRERR_NONE, or OGRERR_UNSUPPORTED_OPERATION of the layer is
+                not writeable
+
+******************************************************************************/
+
+OGRErr OGRLIBKMLLayer::DeleteFeature( long nFID )
+{
+    if( !bUpdate || m_poKmlUpdate == NULL )
+        return OGRERR_UNSUPPORTED_OPERATION;
+
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+    DeletePtr poDelete = poKmlFactory->CreateDelete();
+    m_poKmlUpdate->add_updateoperation(poDelete);
+    PlacemarkPtr poKmlPlacemark = poKmlFactory->CreatePlacemark();
+    poDelete->add_feature(poKmlPlacemark);
     
+    const char* pszId = CPLSPrintf("%s.%ld",
+                    OGRLIBKMLGetSanitizedNCName(GetName()).c_str(), nFID);
+    poKmlPlacemark->set_targetid(pszId);
+
     /***** mark the layer as updated *****/
 
     bUpdated = TRUE;
@@ -567,7 +682,7 @@ int OGRLIBKMLLayer::GetFeatureCount (
         i = OGRLayer::GetFeatureCount( bForce );
     }
 
-    else {
+    else if( m_poKmlLayer != NULL ) {
         size_t iKmlFeature; 
         size_t nKmlFeatures = m_poKmlLayer->get_feature_array_size (  );
         FeaturePtr poKmlFeature;
@@ -616,7 +731,8 @@ OGRErr OGRLIBKMLLayer::GetExtent (
 {
     Bbox oKmlBbox;
 
-    if ( kmlengine::
+    if ( m_poKmlLayer != NULL &&
+        kmlengine::
          GetFeatureBounds ( AsFeature ( m_poKmlLayer ), &oKmlBbox ) ) {
         psExtent->MinX = oKmlBbox.get_west (  );
         psExtent->MinY = oKmlBbox.get_south (  );
@@ -651,17 +767,31 @@ OGRErr OGRLIBKMLLayer::CreateField (
     if ( !bUpdate )
         return OGRERR_UNSUPPORTED_OPERATION;
 
-    SimpleFieldPtr poKmlSimpleField = NULL;
+    if( m_bUseSimpleField )
+    {
+        SimpleFieldPtr poKmlSimpleField = NULL;
 
-    struct fieldconfig oFC;
-    get_fieldconfig( &oFC );
+        if ( (poKmlSimpleField =
+            FieldDef2kml ( poField, m_poOgrDS->GetKmlFactory (  ) )) != NULL )
+        {
+            if( m_poKmlSchema == NULL )
+            {
+                /***** create a new schema *****/
 
-    if ( strcmp(poField->GetNameRef(), oFC.headingfield) != 0 &&
-         strcmp(poField->GetNameRef(), oFC.tiltfield) != 0 &&
-         strcmp(poField->GetNameRef(), oFC.rollfield) != 0 &&
-         (poKmlSimpleField =
-         FieldDef2kml ( poField, m_poOgrDS->GetKmlFactory (  ) )) != NULL )
-        m_poKmlSchema->add_simplefield ( poKmlSimpleField );
+                KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+
+                m_poKmlSchema = poKmlFactory->CreateSchema (  );
+
+                /***** set the id on the new schema *****/
+
+                std::string oKmlSchemaID = OGRLIBKMLGetSanitizedNCName(m_pszName);
+                oKmlSchemaID.append ( ".schema" );
+                m_poKmlSchema->set_id ( oKmlSchemaID );
+            }
+
+            m_poKmlSchema->add_simplefield ( poKmlSimpleField );
+        }
+    }
 
     m_poOgrFeatureDefn->AddFieldDefn ( poField );
 
@@ -721,7 +851,7 @@ void OGRLIBKMLLayer::SetStyleTableDirectly (
     OGRStyleTable * poStyleTable )
 {
 
-    if ( !bUpdate )
+    if ( !bUpdate || m_poKmlLayer == NULL )
         return;
 
     KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
@@ -773,7 +903,7 @@ void OGRLIBKMLLayer::SetStyleTable (
     OGRStyleTable * poStyleTable )
 {
 
-    if ( !bUpdate )
+    if ( !bUpdate || m_poKmlLayer == NULL )
         return;
 
     if ( poStyleTable )
@@ -968,11 +1098,12 @@ void OGRLIBKMLLayer::SetRegionBounds(double dfMinX, double dfMinY,
 /*                            Finalize()                                */
 /************************************************************************/
 
-void OGRLIBKMLLayer::Finalize()
+void OGRLIBKMLLayer::Finalize(DocumentPtr poKmlDocument)
 {
+    KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
+
     if( m_bWriteRegion && m_dfRegionMinX < m_dfRegionMaxX )
     {
-        KmlFactory *poKmlFactory = m_poOgrDS->GetKmlFactory (  );
         RegionPtr region = poKmlFactory->CreateRegion();
 
         LatLonAltBoxPtr box = poKmlFactory->CreateLatLonAltBox();
@@ -996,6 +1127,13 @@ void OGRLIBKMLLayer::Finalize()
         region->set_lod(lod);
         m_poKmlLayer->set_region(region);
     }
+
+    createkmlliststyle (poKmlFactory,
+                        GetName(),
+                        m_poKmlLayer,
+                        poKmlDocument,
+                        osListStyleType,
+                        osListStyleIconHref);
 }
 
 /************************************************************************/
@@ -1101,4 +1239,15 @@ void OGRLIBKMLLayer::SetScreenOverlay(const char* pszSOHref,
     }
 
     m_poKmlLayer->add_feature(so);
+}
+
+/************************************************************************/
+/*                           SetListStyle()                              */
+/************************************************************************/
+
+void OGRLIBKMLLayer::SetListStyle(const char* pszListStyleType,
+                                  const char* pszListStyleIconHref)
+{
+    osListStyleType = (pszListStyleType) ? pszListStyleType : "";
+    osListStyleIconHref = (pszListStyleIconHref) ? pszListStyleIconHref : "";
 }

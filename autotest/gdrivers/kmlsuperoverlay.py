@@ -8,7 +8,7 @@
 # Author:   Even Rouault <even dot rouault at mines dash paris dot org>
 #
 ###############################################################################
-# Copyright (c) 2010, Even Rouault <even dot rouault at mines dash paris dot org>
+# Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
 #
 # Permission is hereby granted, free of charge, to any person oxyzaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -144,7 +144,13 @@ def kmlsuperoverlay_4():
     gdal.FileFromMemBuffer("/vsimem/src.vrt", vrt_xml)
 
     src_ds = gdal.Open("/vsimem/src.vrt")
-    ds = gdal.GetDriverByName('KMLSUPEROVERLAY').CreateCopy('/vsimem/kmlsuperoverlay_4.kmz', src_ds, options = ['FORMAT=PNG'])
+    ds = gdal.GetDriverByName('KMLSUPEROVERLAY').CreateCopy('/vsimem/kmlsuperoverlay_4.kmz', src_ds, options = ['FORMAT=PNG', 'NAME=myname', 'DESCRIPTION=mydescription', 'ALTITUDE=10', 'ALTITUDEMODE=absolute'])
+    if ds.GetMetadataItem('NAME') != 'myname':
+        gdaltest.post_reason('fail')
+        return 'fail'
+    if ds.GetMetadataItem('DESCRIPTION') != 'mydescription':
+        gdaltest.post_reason('fail')
+        return 'fail'
     if ds.GetRasterBand(1).GetOverviewCount() != 1:
         gdaltest.post_reason('fail')
         ds = None
@@ -243,6 +249,42 @@ def kmlsuperoverlay_5():
     return 'success'
 
 ###############################################################################
+# Test raster KML with alternate structure (such as http://opentopo.sdsc.edu/files/Haiti/NGA_Haiti_LiDAR2.kmz))
+
+def kmlsuperoverlay_6():
+
+    ds = gdal.Open('data/kmlimage.kmz')
+    if ds.GetProjectionRef().find('WGS_1984') < 0:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    got_gt = ds.GetGeoTransform()
+    ref_gt = [ 1.2554125761846773, 1.6640895429971981e-05, 0.0, 43.452120815728101, 0.0, -1.0762348187666334e-05 ]
+    for i in range(6):
+        if abs(got_gt[i] - ref_gt[i]) > 1e-6:
+            gdaltest.post_reason('failure')
+            print(got_gt)
+            return 'fail'
+    for i in range(4):
+        cs = ds.GetRasterBand(i+1).Checksum()
+        if cs != 47673:
+            print(cs)
+            gdaltest.post_reason('failure')
+            return 'fail'
+        if ds.GetRasterBand(i+1).GetRasterColorInterpretation() != gdal.GCI_RedBand + i:
+            gdaltest.post_reason('failure')
+            return 'fail'
+    if ds.GetRasterBand(1).GetOverviewCount() != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    cs = ds.GetRasterBand(1).GetOverview(0).Checksum()
+    if cs != 61070:
+        print(cs)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
 # Cleanup
 
 def  kmlsuperoverlay_cleanup():
@@ -256,6 +298,7 @@ gdaltest_list = [
     kmlsuperoverlay_3,
     kmlsuperoverlay_4,
     kmlsuperoverlay_5,
+    kmlsuperoverlay_6,
     kmlsuperoverlay_cleanup ]
 
 if __name__ == '__main__':

@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 1998, 2002, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2007-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -60,6 +61,10 @@
 #endif
 
 CPL_CVSID("$Id$");
+
+#if SIZEOF_VOIDP == 4
+static int bGlobalStripIntegerOverflow = FALSE;
+#endif
 
 /************************************************************************/
 /* ==================================================================== */
@@ -386,7 +391,7 @@ class GTiffDataset : public GDALPamDataset
 
     int           bIgnoreReadErrors;
 
-    CPLString     osWldFilename;
+    CPLString     osGeorefFilename;
 
     int           bDirectIO;
     
@@ -6199,8 +6204,32 @@ GDALDataset *GTiffDataset::Open( GDALOpenInfo * poOpenInfo )
 
     /* Disable strip chop for now */
     hTIFF = VSI_TIFFOpen( pszFilename, ( poOpenInfo->eAccess == GA_ReadOnly ) ? "rc" : "r+c" );
+#if SIZEOF_VOIDP == 4
+    if( hTIFF == NULL )
+    {
+        /* Case of one-strip file where the strip size is > 2GB (#5403) */
+        if( bGlobalStripIntegerOverflow )
+        {
+            hTIFF = VSI_TIFFOpen( pszFilename, ( poOpenInfo->eAccess == GA_ReadOnly ) ? "r" : "r+" );
+            bGlobalStripIntegerOverflow = FALSE;
+            if( hTIFF == NULL )
+            {
+                return( NULL );
+            }
+        }
+        else
+        {
+            return( NULL );
+        }
+    }
+    else
+    {
+        bGlobalStripIntegerOverflow = FALSE;
+    }
+#else
     if( hTIFF == NULL )
         return( NULL );
+#endif
 
     uint32  nXSize, nYSize;
     uint16  nPlanarConfig;
@@ -6986,13 +7015,13 @@ void GTiffDataset::SaveICCProfile(GTiffDataset *pDS, TIFF *hTIFF, char **papszPa
                 }
             }
             CSLDestroy( papszTokens );
+
+            if (bOutputWhitepoint)
+            {
+                TIFFSetField(hTIFF, TIFFTAG_WHITEPOINT, pWP);
+            }
         }
         
-        if (bOutputWhitepoint)
-        {
-            TIFFSetField(hTIFF, TIFFTAG_WHITEPOINT, pWP);
-        }
-
         /* Set transfer function metadata */
         char const *pszTFRed = NULL;
         char const *pszTFGreen = NULL;
@@ -7504,38 +7533,44 @@ CPLErr GTiffDataset::OpenOffset( TIFF *hTIFFIn,
         }
 
 /* -------------------------------------------------------------------- */
-/*      Otherwise try looking for a .tfw, .tifw or .wld file.           */
+/*      Otherwise try looking for a .tab, .tfw, .tifw or .wld file.     */
 /* -------------------------------------------------------------------- */
         else
         {
-            char* pszWldFilename = NULL;
+            char* pszGeorefFilename = NULL;
 
-            bGeoTransformValid =
-                GDALReadWorldFile2( osFilename, NULL, adfGeoTransform,
-                                    papszSiblingFiles, &pszWldFilename);
+            /* Begin with .tab since it can also have projection info */
+            int bTabFileOK =
+                GDALReadTabFile2( osFilename, adfGeoTransform,
+                                    &pszTabWKT, &nGCPCount, &pasGCPList,
+                                    papszSiblingFiles, &pszGeorefFilename );
 
-            if( !bGeoTransformValid )
+            if( bTabFileOK )
             {
-                bGeoTransformValid =
-                    GDALReadWorldFile2( osFilename, "wld", adfGeoTransform,
-                                        papszSiblingFiles, &pszWldFilename);
-            }
-
-            if( !bGeoTransformValid )
-            {
-                int bTabFileOK =
-                    GDALReadTabFile2( osFilename, adfGeoTransform,
-                                      &pszTabWKT, &nGCPCount, &pasGCPList,
-                                      papszSiblingFiles, &pszWldFilename );
-
-                if( bTabFileOK && nGCPCount == 0 )
+                if( nGCPCount == 0 )
                     bGeoTransformValid = TRUE;
             }
-
-            if (pszWldFilename)
+            else
             {
-                osWldFilename = pszWldFilename;
-                CPLFree(pszWldFilename);
+                if( !bGeoTransformValid )
+                {
+                    bGeoTransformValid =
+                        GDALReadWorldFile2( osFilename, NULL, adfGeoTransform,
+                                            papszSiblingFiles, &pszGeorefFilename);
+                }
+
+                if( !bGeoTransformValid )
+                {
+                    bGeoTransformValid =
+                        GDALReadWorldFile2( osFilename, "wld", adfGeoTransform,
+                                            papszSiblingFiles, &pszGeorefFilename);
+                }
+            }
+
+            if (pszGeorefFilename)
+            {
+                osGeorefFilename = pszGeorefFilename;
+                CPLFree(pszGeorefFilename);
             }
         }
 
@@ -10439,10 +10474,10 @@ char **GTiffDataset::GetFileList()
     if (osRPCFile.size() != 0)
         papszFileList = CSLAddString( papszFileList, osRPCFile );
 
-    if (osWldFilename.size() != 0 &&
-        CSLFindString(papszFileList, osWldFilename) == -1)
+    if (osGeorefFilename.size() != 0 &&
+        CSLFindString(papszFileList, osGeorefFilename) == -1)
     {
-        papszFileList = CSLAddString( papszFileList, osWldFilename );
+        papszFileList = CSLAddString( papszFileList, osGeorefFilename );
     }
 
     return papszFileList;
@@ -10635,6 +10670,28 @@ void
 GTiffErrorHandler(const char* module, const char* fmt, va_list ap )
 {
     char *pszModFmt;
+
+#if SIZEOF_VOIDP == 4
+    /* Case of one-strip file where the strip size is > 2GB (#5403) */
+    if( strcmp(module, "TIFFStripSize") == 0 &&
+        strstr(fmt, "Integer overflow") != NULL )
+    {
+        bGlobalStripIntegerOverflow = TRUE;
+        return;
+    }
+    if( bGlobalStripIntegerOverflow &&
+        strstr(fmt, "Cannot handle zero strip size") != NULL )
+    {
+        return;
+    }
+#endif
+
+#ifdef BIGTIFF_SUPPORT
+    if( strcmp(fmt, "Maximum TIFF file size exceeded") == 0 )
+    {
+        fmt = "Maximum TIFF file size exceeded. Use BIGTIFF=YES creation option.";
+    }
+#endif
 
     pszModFmt = PrepareTIFFErrorFormat( module, fmt );
     CPLErrorV( CE_Failure, CPLE_AppDefined, pszModFmt, ap );

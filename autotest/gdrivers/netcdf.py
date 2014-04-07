@@ -9,6 +9,8 @@
 # 
 ###############################################################################
 # Copyright (c) 2007, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
+# Copyright (c) 2010, Kyle Shannon <kyle at pobox dot com>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -31,6 +33,7 @@
 
 import os
 import sys
+import shutil
 from osgeo import gdal
 from osgeo import osr
 
@@ -1346,6 +1349,82 @@ def netcdf_38():
     return 'success'
 
 ###############################################################################
+# Test VRT and NETCDF:
+
+def netcdf_39():
+
+    if gdaltest.netcdf_drv is None:
+        return 'skip'
+
+    shutil.copy('data/two_vars_scale_offset.nc', 'tmp')
+    src_ds = gdal.Open('NETCDF:tmp/two_vars_scale_offset.nc:z')
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('tmp/netcdf_39.vrt', src_ds)
+    out_ds = None
+    src_ds = None
+
+    ds = gdal.Open('tmp/netcdf_39.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/two_vars_scale_offset.nc')
+    gdal.Unlink('tmp/netcdf_39.vrt')
+    if cs != 65463:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+
+    shutil.copy('data/two_vars_scale_offset.nc', 'tmp')
+    src_ds = gdal.Open('NETCDF:"tmp/two_vars_scale_offset.nc":z')
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('tmp/netcdf_39.vrt', src_ds)
+    out_ds = None
+    src_ds = None
+
+    ds = gdal.Open('tmp/netcdf_39.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/two_vars_scale_offset.nc')
+    gdal.Unlink('tmp/netcdf_39.vrt')
+    if cs != 65463:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+
+    shutil.copy('data/two_vars_scale_offset.nc', 'tmp')
+    src_ds = gdal.Open('NETCDF:"%s/tmp/two_vars_scale_offset.nc":z' % os.getcwd())
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('%s/tmp/netcdf_39.vrt' % os.getcwd(), src_ds)
+    out_ds = None
+    src_ds = None
+
+    ds = gdal.Open('tmp/netcdf_39.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/two_vars_scale_offset.nc')
+    gdal.Unlink('tmp/netcdf_39.vrt')
+    if cs != 65463:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+
+    src_ds = gdal.Open('NETCDF:"%s/data/two_vars_scale_offset.nc":z' % os.getcwd())
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('tmp/netcdf_39.vrt', src_ds)
+    out_ds = None
+    src_ds = None
+
+    ds = gdal.Open('tmp/netcdf_39.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/netcdf_39.vrt')
+    if cs != 65463:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+        
+    return 'success'
+    
+###############################################################################
 
 ###############################################################################
 # main tests list
@@ -1388,7 +1467,8 @@ gdaltest_list = [
     netcdf_35,
     netcdf_36,
     netcdf_37,
-    netcdf_38
+    netcdf_38,
+    netcdf_39
  ]
 
 ###############################################################################

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 ###############################################################################
 # $Id$
 #
@@ -7,7 +8,7 @@
 # Author:   Even Rouault <even dot rouault at mines dash paris dot org>
 #
 ###############################################################################
-# Copyright (c) 2011, Even Rouault <even dot rouault at mines dash paris dot org>
+# Copyright (c) 2011-2014, Even Rouault <even dot rouault at mines-paris dot org>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -352,7 +353,11 @@ def ogr_couchdb_changeLayer():
     ogrtest.couchdb_test_layer = 'poly_nongeojson'
     return 'success'
 
-gdaltest_list = [ 
+# CouchDB tests fail in unreliable ways on Travis
+if gdaltest.skip_on_travis():
+    gdaltest_list = []
+else:
+    gdaltest_list = [ 
     ogr_couchdb_init,
     ogr_couchdb_GetFeatureCount,
     ogr_couchdb_GetNextFeature,

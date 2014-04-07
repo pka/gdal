@@ -8,7 +8,7 @@
 # Author:   Even Rouault <even dot rouault at mines dash paris dot org>
 # 
 ###############################################################################
-# Copyright (c) 2012, Even Rouault <even dot rouault at mines dash paris dot org>
+# Copyright (c) 2012-2014, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -308,7 +308,7 @@ def ogr_osm_3(options = None):
         options = ' ' + options
     else:
         options = ''
-    gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' tmp/ogr_osm_3 data/test.pbf points lines polygons multipolygons multilinestrings -progress' + options)
+    gdaltest.runexternal(test_cli_utilities.get_ogr2ogr_path() + ' tmp/ogr_osm_3 data/test.pbf points lines multipolygons multilinestrings -progress' + options)
 
     ret = ogr_osm_1('tmp/ogr_osm_3')
 

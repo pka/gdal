@@ -8,7 +8,7 @@
 # Author:   Even Rouault <even dot rouault at mines dash paris dot org>
 # 
 ###############################################################################
-# Copyright (c) 2010, Even Rouault <even dot rouault at mines dash paris dot org>
+# Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -64,8 +64,8 @@ def ogr_libkml_datastore():
     except:
         pass
 
-    # Unregister LIBKML driver if present as it's behaviour is not identical
-    # to old KML driver
+    # Unregister KML driver if present as its behaviour is not identical
+    # to new LIBKML driver
     if ogrtest.kml_drv is not None:
         print('Unregister KML driver')
         ogrtest.kml_drv.Deregister()
@@ -388,21 +388,23 @@ def ogr_libkml_write(filename):
     if ogrtest.kml_drv is None:
         return 'skip'
 
-    srs = osr.SpatialReference()
-    srs.SetWellKnownGeogCS('WGS72')
     ds = ogr.GetDriverByName('LIBKML').CreateDataSource(filename)
-    lyr = ds.CreateLayer('test_wgs72', srs = srs)
 
-    dst_feat = ogr.Feature( lyr.GetLayerDefn() )
-    dst_feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (2 49)'))
-    if lyr.CreateFeature( dst_feat ) != 0:
-        gdaltest.post_reason('CreateFeature failed.')
-        return 'fail'
-    if dst_feat.GetGeometryRef().ExportToWkt() != 'POINT (2 49)':
-        print(dst_feat.GetGeometryRef().ExportToWkt())
-        gdaltest.post_reason('CreateFeature changed the geometry.')
-        return 'fail'
-    dst_feat.Destroy()
+    if filename != '/vsimem/libkml_use_doc_off.kmz':
+        srs = osr.SpatialReference()
+        srs.SetWellKnownGeogCS('WGS72')
+        lyr = ds.CreateLayer('test_wgs72', srs = srs)
+
+        dst_feat = ogr.Feature( lyr.GetLayerDefn() )
+        dst_feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (2 49)'))
+        if lyr.CreateFeature( dst_feat ) != 0:
+            gdaltest.post_reason('CreateFeature failed.')
+            return 'fail'
+        if dst_feat.GetGeometryRef().ExportToWkt() != 'POINT (2 49)':
+            print(dst_feat.GetGeometryRef().ExportToWkt())
+            gdaltest.post_reason('CreateFeature changed the geometry.')
+            return 'fail'
+        dst_feat.Destroy()
 
     lyr = ds.CreateLayer('test_wgs84')
 
@@ -485,7 +487,10 @@ def ogr_libkml_check_write(filename):
         return 'skip'
 
     ds = ogr.Open(filename)
-    lyr = ds.GetLayerByName('test_wgs84')
+    if filename != '/vsimem/libkml_use_doc_off.kmz':
+        lyr = ds.GetLayerByName('test_wgs84')
+    else:
+        lyr = ds.GetLayer(0)
     if lyr.GetFeatureCount() != 8:
         gdaltest.post_reason('Bad feature count.')
         return 'fail'
@@ -574,6 +579,15 @@ def ogr_libkml_write_kmz():
 
 def ogr_libkml_check_write_kmz():
     return ogr_libkml_check_write('/vsimem/libkml.kmz')
+
+def ogr_libkml_write_kmz_use_doc_off():
+    gdal.SetConfigOption("LIBKML_USE_DOC.KML", "NO")
+    ret = ogr_libkml_write('/vsimem/libkml_use_doc_off.kmz')
+    gdal.SetConfigOption("LIBKML_USE_DOC.KML", None)
+    return ret
+
+def ogr_libkml_check_write_kmz_use_doc_off():
+    return ogr_libkml_check_write('/vsimem/libkml_use_doc_off.kmz')
 
 def ogr_libkml_write_dir():
     return ogr_libkml_write('/vsimem/libkmldir')
@@ -806,9 +820,11 @@ def ogr_libkml_gxtrack():
     lyr = ds.GetLayer(0)
 
     feat = lyr.GetNextFeature()
-    if feat.GetGeometryRef().ExportToWkt() != 'LINESTRING (2 49,3 50)':
-        print(feat.GetGeometryRef().ExportToWkt())
-        gdaltest.post_reason('Unexpected geometry.')
+    if feat.GetField('begin') != '2013/05/28 12:00:00' or \
+       feat.GetField('end') != '2013/05/28 13:00:00' or \
+       feat.GetGeometryRef().ExportToWkt() != 'LINESTRING (2 49,3 50)':
+        feat.DumpReadable()
+        gdaltest.post_reason('failure')
         return 'fail'
     ds = None
 
@@ -845,6 +861,7 @@ def ogr_libkml_camera():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_camera.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<Camera>') == -1 or \
@@ -862,7 +879,7 @@ def ogr_libkml_camera():
     lyr = ds.GetLayer(0)
 
     feat = lyr.GetNextFeature()
-    if feat.GetGeometryRef().ExportToWkt() != 'POINT (2 49)' or \
+    if feat.GetGeometryRef().ExportToWkt() != 'POINT (2 49 0)' or \
        feat.GetField("heading") != 70.0 or \
        feat.GetField("tilt") != 75.0 or \
        feat.GetField("roll") != 10.0:
@@ -901,6 +918,7 @@ def ogr_libkml_write_layer_lookat():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_layer_lookat.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<LookAt>') == -1 or \
@@ -942,6 +960,7 @@ def ogr_libkml_write_layer_camera():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_layer_camera.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<Camera>') == -1 or \
@@ -1013,9 +1032,10 @@ def ogr_libkml_write_snippet():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_snippet.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
-    if data.find('<snippet>') == -1:
+    if data.find('<snippet>test_snippet</snippet>') == -1:
         print(data)
         gdaltest.post_reason('failure')
         return 'fail'
@@ -1048,6 +1068,7 @@ def ogr_libkml_write_atom_author():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_atom_author.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">') == -1 or \
@@ -1074,6 +1095,7 @@ def ogr_libkml_write_atom_link():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_atom_link.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">') == -1 or \
@@ -1098,6 +1120,7 @@ def ogr_libkml_write_phonenumber():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_phonenumber.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<phoneNumber>tel:911</phoneNumber>') == -1:
@@ -1128,6 +1151,7 @@ def ogr_libkml_write_region():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_region.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<north>49</north>') == -1 or \
@@ -1183,6 +1207,7 @@ def ogr_libkml_write_screenoverlay():
 
     f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_screenoverlay.kml', 'rb')
     data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
     gdal.VSIFCloseL(f)
 
     if data.find('<href>http://foo</href>') == -1 or \
@@ -1203,6 +1228,746 @@ def ogr_libkml_write_screenoverlay():
     return 'success'
 
 ###############################################################################
+# Test writing Model
+
+def ogr_libkml_write_model():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_model.kml")
+    lyr = ds.CreateLayer('test')
+    lyr.CreateField(ogr.FieldDefn("model", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("heading", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("tilt", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("roll", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("altitudeMode", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("scale_x", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("scale_y", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("scale_z", ogr.OFTReal))
+
+    feat = ogr.Feature( lyr.GetLayerDefn() )
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (2 49 10)'))
+    feat.SetField("tilt", 75)
+    feat.SetField("roll", 10)
+    feat.SetField("heading", -70)
+    feat.SetField("scale_x", 2)
+    feat.SetField("scale_y", 3)
+    feat.SetField("scale_z", 4)
+    feat.SetField("altitudeMode", "relativeToGround")
+    feat.SetField("model", "http://makc.googlecode.com/svn/trunk/flash/sandy_flar2/cube.dae")
+    lyr.CreateFeature(feat)
+
+    feat = ogr.Feature( lyr.GetLayerDefn() )
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT (2 49)'))
+    feat.SetField("model", "http://foo")
+    lyr.CreateFeature(feat)
+
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_model.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<longitude>2</longitude>') == -1 or \
+       data.find('<latitude>49</latitude>') == -1 or \
+       data.find('<altitude>10</altitude>') == -1 or \
+       data.find('<altitudeMode>relativeToGround</altitudeMode>') == -1 or \
+       data.find('<heading>-70</heading>') == -1 or \
+       data.find('<tilt>75</tilt>') == -1 or \
+       data.find('<roll>10</roll>') == -1 or \
+       data.find('<x>2</x>') == -1 or \
+       data.find('<y>3</y>') == -1 or \
+       data.find('<z>4</z>') == -1 or \
+       data.find('<x>1</x>') == -1 or \
+       data.find('<y>1</y>') == -1 or \
+       data.find('<z>1</z>') == -1 or \
+       data.find('<href>http://makc.googlecode.com/svn/trunk/flash/sandy_flar2/cube.dae</href>') == -1 or \
+       data.find('<href>http://foo</href>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    # This can only appear if HTTP ressource is available
+    if data.find('<targetHref>http://makc.googlecode.com/svn/trunk/flash/sandy_flar2/cube.gif</targetHref>') == -1 or \
+       data.find('<sourceHref>cube.gif</sourceHref>') == -1:
+
+        if gdaltest.gdalurlopen('http://makc.googlecode.com/svn/trunk/flash/sandy_flar2/cube.dae') is not None:
+            print(data)
+            gdaltest.post_reason('failure')
+            return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test read / write of style
+
+def ogr_libkml_read_write_style():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_style_read.kml', 'wb')
+
+    styles = """<Style id="style1">
+            <IconStyle>
+                <color>01234567</color>
+                <scale>1.1</scale>
+                <heading>50</heading>
+                <Icon>
+                    <href>http://style1</href>
+                </Icon>
+                <hotSpot x="15" y="20"/>
+            </IconStyle>
+            <LabelStyle>
+                <color>01234567</color>
+                <scale>1.1</scale>
+            </LabelStyle>
+            <BalloonStyle>
+                <bgColor>ff00ffff</bgColor>
+                <text><![CDATA[This is $[name], whose description is:<br/>$[description]]]></text>
+            </BalloonStyle>
+        </Style>
+        <Style id="style2">
+            <LineStyle>
+                <color>01234567</color>
+                <width>1</width>
+            </LineStyle>
+            <PolyStyle>
+                <color>01234567</color>
+            </PolyStyle>
+        </Style>"""
+
+    content = """<kml xmlns="http://www.opengis.net/kml/2.2">
+    <Document>
+        %s
+        <StyleMap id="styleMapExample">
+            <Pair>
+                <key>normal</key>
+                <Style id="inline_style">
+                    <IconStyle>
+                        <Icon>
+                            <href>http://inline_style</href>
+                        </Icon>
+                    </IconStyle>
+                </Style>
+            </Pair>
+            <Pair>
+                <key>highlight</key>
+                <styleUrl>#style2</styleUrl>
+            </Pair>
+        </StyleMap>
+    </Document>
+    </kml>""" % styles
+    
+    resolved_stylemap = """<Style id="styleMapExample">
+      <IconStyle>
+        <Icon>
+          <href>http://inline_style</href>
+        </Icon>
+      </IconStyle>
+    </Style>"""
+
+    resolved_stylemap_highlight = """<Style id="styleMapExample">
+        <LineStyle>
+            <color>01234567</color>
+            <width>1</width>
+        </LineStyle>
+        <PolyStyle>
+            <color>01234567</color>
+        </PolyStyle>
+    </Style>"""
+    gdal.VSIFWriteL(content, 1, len(content), f)
+    gdal.VSIFCloseL(f)
+
+    src_ds = ogr.Open('/vsimem/ogr_libkml_read_write_style_read.kml')
+    style_table = src_ds.GetStyleTable()
+
+    options = [ 'style1_balloonstyle_bgcolor=#FFFF00',
+                'style1_balloonstyle_text=This is $[name], whose description is:<br/>$[description]']
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource('/vsimem/ogr_libkml_read_write_style_write.kml', options = options)
+    ds.SetStyleTable(style_table)
+    ds = None
+    src_ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_style_write.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+    lines = [ l.strip() for l in data.split('\n')]
+
+    lines_got = lines[lines.index('<Style id="style1">'):lines.index('<Style id="styleMapExample">')]
+    lines_ref = [ l.strip() for l in styles.split('\n')]
+    if lines_got != lines_ref:
+        print(data)
+        print(styles)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    lines_got = lines[lines.index('<Style id="styleMapExample">'):lines.index('</Document>')]
+    lines_ref = [ l.strip() for l in resolved_stylemap.split('\n')]
+    if lines_got != lines_ref:
+        print(data)
+        print(resolved_stylemap)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    # Test reading highlight style in StyleMap
+    gdal.SetConfigOption('LIBKML_STYLEMAP_KEY', 'HIGHLIGHT')
+    src_ds = ogr.Open('/vsimem/ogr_libkml_read_write_style_read.kml')
+    style_table = src_ds.GetStyleTable()
+    gdal.SetConfigOption('LIBKML_STYLEMAP_KEY', None)
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource('/vsimem/ogr_libkml_read_write_style_write.kml')
+    ds.SetStyleTable(style_table)
+    ds = None
+    src_ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_style_write.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+    lines = [ l.strip() for l in data.split('\n')]
+
+    lines_got = lines[lines.index('<Style id="styleMapExample">'):lines.index('</Document>')]
+    lines_ref = [ l.strip() for l in resolved_stylemap_highlight.split('\n')]
+    if lines_got != lines_ref:
+        print(data)
+        print(resolved_stylemap_highlight)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    # Test writing feature style
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource('/vsimem/ogr_libkml_read_write_style_write.kml')
+    lyr = ds.CreateLayer('test')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetStyleString('@unknown_style')
+    lyr.CreateFeature(feat)
+    feat = None
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    style_string = 'PEN(c:#01234567,w:5.000000px);BRUSH(fc:#01234567);SYMBOL(id:"http://foo",a:50.000000,c:#01234567,s:1.100000);LABEL(c:#01234567,w:150.000000)'
+    feat.SetStyleString(style_string)
+    lyr.CreateFeature(feat)
+    feat = None
+    ds = None
+    
+    ds = ogr.Open('/vsimem/ogr_libkml_read_write_style_write.kml')
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetNextFeature()
+    if feat.GetStyleString() != '@unknown_style':
+        print(feat.GetStyleString())
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = lyr.GetNextFeature()
+    if feat.GetStyleString() != style_string:
+        print(feat.GetStyleString())
+        gdaltest.post_reason('failure')
+        return 'fail'
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_style_write.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    expected_style = """<Style>
+          <IconStyle>
+            <color>67452301</color>
+            <scale>1.1</scale>
+            <heading>50</heading>
+            <Icon>
+              <href>http://foo</href>
+            </Icon>
+          </IconStyle>
+          <LabelStyle>
+            <color>67452301</color>
+            <scale>1.5</scale>
+          </LabelStyle>
+          <LineStyle>
+            <color>67452301</color>
+            <width>5</width>
+          </LineStyle>
+          <PolyStyle>
+            <color>67452301</color>
+          </PolyStyle>
+        </Style>"""
+    lines = [ l.strip() for l in data.split('\n')]
+
+    lines_got = lines[lines.index('<Style>'):lines.index('</Style>')+1]
+    lines_ref = [ l.strip() for l in expected_style.split('\n')]
+    if lines_got != lines_ref:
+        print(data)
+        print(resolved_stylemap_highlight)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    # Automatic StyleMap creation testing
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource('/vsimem/ogr_libkml_read_write_style_write.kml')
+    style_table = ogr.StyleTable()
+    style_table.AddStyle('style1_normal','SYMBOL(id:"http://style1_normal",c:#67452301)')
+    style_table.AddStyle('style1_highlight','SYMBOL(id:"http://style1_highlight",c:#10325476)')
+    ds.SetStyleTable(style_table)
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_style_write.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+    lines = [ l.strip() for l in data.split('\n')]
+
+    expected_styles = """<Style id="style1_normal">
+      <IconStyle>
+        <color>01234567</color>
+        <Icon>
+          <href>http://style1_normal</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Style id="style1_highlight">
+      <IconStyle>
+        <color>76543210</color>
+        <Icon>
+          <href>http://style1_highlight</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <StyleMap id="style1">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#style1_normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#style1_highlight</styleUrl>
+      </Pair>
+    </StyleMap>"""
+
+    lines_got = lines[lines.index('<Style id="style1_normal">'):lines.index('</StyleMap>') + 1]
+    lines_ref = [ l.strip() for l in expected_styles.split('\n')]
+    if lines_got != lines_ref:
+        print(data)
+        print(styles)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing Update
+
+def ogr_libkml_write_update():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    for i in range(3):
+
+        if i == 0:
+            name = "/vsimem/ogr_libkml_write_update.kml"
+        elif i == 1:
+            name = "/vsimem/ogr_libkml_write_update.kmz"
+        else:
+            name = "/vsimem/ogr_libkml_write_update_dir"
+
+        ds = ogr.GetDriverByName('LIBKML').CreateDataSource(name,
+                                                            options = [ 'UPDATE_TARGETHREF=http://foo'] )
+        lyr = ds.CreateLayer('layer_to_edit')
+        feat = ogr.Feature(lyr.GetLayerDefn())
+        lyr.CreateFeature(feat)
+        feat.SetFID(10)
+        lyr.CreateFeature(feat)
+        feat.SetFID(2)
+        lyr.SetFeature(feat)
+        lyr.DeleteFeature(3)
+        ds = None
+
+        if i == 0:
+            f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_update.kml', 'rb')
+        elif i == 1:
+            f = gdal.VSIFOpenL('/vsizip//vsimem/ogr_libkml_write_update.kmz', 'rb')
+        else:
+            f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_update_dir/doc.kml', 'rb')
+        if f is None:
+            gdaltest.post_reason('failure')
+            return 'fail'
+        data = gdal.VSIFReadL(1, 2048, f)
+        data = data.decode('ascii')
+        gdal.VSIFCloseL(f)
+
+        if data.find('<NetworkLinkControl>') == -1 or \
+        data.find('<Update>') == -1 or \
+        data.find('<targetHref>http://foo</targetHref>') == -1 or \
+        data.find('<Placemark/>') == -1 or \
+        data.find('<Placemark id="layer_to_edit.10"/>') == -1 or \
+        data.find('<Create>') == -1 or \
+        data.find('<Document targetId="layer_to_edit">') == -1 or \
+        data.find('<Change>') == -1 or \
+        data.find('<Placemark targetId="layer_to_edit.2"/>') == -1 or \
+        data.find('<Delete>') == -1 or \
+        data.find('<Placemark targetId="layer_to_edit.3"/>') == -1:
+            print(data)
+            gdaltest.post_reason('failure')
+            return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing NetworkLinkControl
+
+def ogr_libkml_write_networklinkcontrol():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    options = [ 'NLC_MINREFRESHPERIOD=3600',
+                'NLC_MAXSESSIONLENGTH=-1',
+                'NLC_COOKIE=cookie',
+                'NLC_MESSAGE=message',
+                'NLC_LINKNAME=linkname',
+                'NLC_LINKDESCRIPTION=linkdescription',
+                'NLC_LINKSNIPPET=linksnippet',
+                'NLC_EXPIRES=2014-12-31T23:59:59Z' ]
+
+    for i in range(3):
+
+        if i == 0:
+            name = "/vsimem/ogr_libkml_write_networklinkcontrol.kml"
+        elif i == 1:
+            name = "/vsimem/ogr_libkml_write_networklinkcontrol.kmz"
+        else:
+            name = "/vsimem/ogr_libkml_write_networklinkcontrol_dir"
+
+        ds = ogr.GetDriverByName('LIBKML').CreateDataSource(name, options = options)
+        ds = None
+
+        if i == 0:
+            f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_networklinkcontrol.kml', 'rb')
+        elif i == 1:
+            f = gdal.VSIFOpenL('/vsizip//vsimem/ogr_libkml_write_networklinkcontrol.kmz', 'rb')
+        else:
+            f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_networklinkcontrol_dir/doc.kml', 'rb')
+        if f is None:
+            gdaltest.post_reason('failure')
+            return 'fail'
+        data = gdal.VSIFReadL(1, 2048, f)
+        data = data.decode('ascii')
+        gdal.VSIFCloseL(f)
+
+        if data.find('<minRefreshPeriod>3600</minRefreshPeriod>') == -1 or \
+        data.find('<maxSessionLength>-1</maxSessionLength>') == -1 or \
+        data.find('<cookie>cookie</cookie>') == -1 or \
+        data.find('<message>message</message>') == -1 or \
+        data.find('<linkName>linkname</linkName>') == -1 or \
+        data.find('<linkDescription>linkdescription</linkDescription>') == -1 or \
+        data.find('<linkSnippet>linksnippet</linkSnippet>') == -1 or \
+        data.find('<expires>2014-12-31T23:59:59Z</expires>') == -1:
+            print(data)
+            gdaltest.post_reason('failure')
+            return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing ListStyle
+
+def ogr_libkml_write_liststyle():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    options = [ 'LISTSTYLE_ICON_HREF=http://www.gdal.org/gdalicon.png' ]
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_liststyle.kml", options = options)
+    lyr = ds.CreateLayer('test', options = [ 'LISTSTYLE_ICON_HREF=http://foo'] )
+    lyr = ds.CreateLayer('test_check', options = [ 'LISTSTYLE_TYPE=check'] )
+    lyr = ds.CreateLayer('test_radioFolder', options = [ 'LISTSTYLE_TYPE=radioFolder'] )
+    lyr = ds.CreateLayer('test_checkOffOnly', options = [ 'LISTSTYLE_TYPE=checkOffOnly'] )
+    lyr = ds.CreateLayer('test_checkHideChildren', options = [ 'LISTSTYLE_TYPE=checkHideChildren'] )
+    lyr = ds.CreateLayer('test_error', options = [ 'LISTSTYLE_TYPE=error'] )
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_liststyle.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<styleUrl>#root_doc_liststyle</styleUrl>') == -1 or \
+       data.find('<Style id="root_doc_liststyle">') == -1 or \
+       data.find('<href>http://www.gdal.org/gdalicon.png</href>') == -1 or \
+       data.find('<styleUrl>#test_liststyle</styleUrl>') == -1 or \
+       data.find('<Style id="test_liststyle">') == -1 or \
+       data.find('<href>http://foo</href>') == -1 or \
+       data.find('<listItemType>check</listItemType>') == -1 or \
+       data.find('<listItemType>radioFolder</listItemType>') == -1 or \
+       data.find('<listItemType>checkOffOnly</listItemType>') == -1 or \
+       data.find('<listItemType>checkHideChildren</listItemType>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing NetworkLink
+
+def ogr_libkml_write_networklink():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_networklink.kml")
+    lyr = ds.CreateLayer('test')
+    lyr.CreateField(ogr.FieldDefn('name', ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("networklink", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("networklink_refreshvisibility", ogr.OFTInteger))
+    lyr.CreateField(ogr.FieldDefn("networklink_flytoview", ogr.OFTInteger))
+    lyr.CreateField(ogr.FieldDefn("networklink_refreshMode", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("networklink_refreshInterval", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("networklink_viewRefreshMode", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("networklink_viewRefreshTime", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("networklink_viewBoundScale", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("networklink_viewFormat", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("networklink_httpQuery", ogr.OFTString))
+
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetField("name", "a network link")
+    feat.SetField("networklink", "http://developers.google.com/kml/documentation/Point.kml")
+    feat.SetField("networklink_refreshVisibility", 1)
+    feat.SetField("networklink_flyToView", 1)
+    feat.SetField("networklink_refreshInterval", 60)
+    feat.SetField("networklink_httpQuery", "[clientVersion]")
+    lyr.CreateFeature(feat)
+
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetField("networklink", "http://developers.google.com/kml/documentation/Point.kml")
+    feat.SetField("networklink_viewRefreshTime", 30)
+    lyr.CreateFeature(feat)
+
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetField("networklink", "http://developers.google.com/kml/documentation/Point.kml")
+    feat.SetField("networklink_refreshMode", 'onExpire')
+    feat.SetField("networklink_viewRefreshMode", 'onRegion')
+    feat.SetField("networklink_viewBoundScale", 0.5)
+    feat.SetField("networklink_viewFormat", 'BBOX=[bboxWest],[bboxSouth],[bboxEast],[bboxNorth]')
+    lyr.CreateFeature(feat)
+
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_networklink.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<name>a network link</name>') == -1 or \
+       data.find('<refreshVisibility>1</refreshVisibility>') == -1 or \
+       data.find('<flyToView>1</flyToView>') == -1 or \
+       data.find('<href>http://developers.google.com/kml/documentation/Point.kml</href>') == -1 or \
+       data.find('<refreshMode>onInterval</refreshMode>') == -1 or \
+       data.find('<refreshInterval>60</refreshInterval>') == -1 or \
+       data.find('<httpQuery>[clientVersion]</httpQuery>') == -1 or \
+       data.find('<viewRefreshMode>onStop</viewRefreshMode>') == -1 or \
+       data.find('<viewRefreshTime>30</viewRefreshTime>') == -1 or \
+       data.find('<refreshMode>onExpire</refreshMode>') == -1 or \
+       data.find('<viewRefreshMode>onRegion</viewRefreshMode>') == -1 or \
+       data.find('<viewBoundScale>0.5</viewBoundScale>') == -1 or \
+       data.find('<viewFormat>BBOX=[bboxWest],[bboxSouth],[bboxEast],[bboxNorth]</viewFormat>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing PhotoOverlay
+
+def ogr_libkml_write_photooverlay():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_photooverlay.kml")
+    lyr = ds.CreateLayer('test')
+    lyr.CreateField(ogr.FieldDefn('name', ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("heading", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("tilt", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("roll", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("camera_longitude", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("camera_latitude", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("camera_altitude", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("camera_altitudemode", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("photooverlay", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("leftfov", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("rightfov", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("bottomfov", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("topfov", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("near", ogr.OFTReal))
+    lyr.CreateField(ogr.FieldDefn("photooverlay_shape", ogr.OFTString))
+    lyr.CreateField(ogr.FieldDefn("imagepyramid_tilesize", ogr.OFTInteger))
+    lyr.CreateField(ogr.FieldDefn("imagepyramid_maxwidth", ogr.OFTInteger))
+    lyr.CreateField(ogr.FieldDefn("imagepyramid_maxheight", ogr.OFTInteger))
+
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetField("name", "a photo overlay")
+    feat.SetField("photooverlay", "http://www.gdal.org/gdalicon.png")
+    feat.SetField("camera_longitude", 2.2946)
+    feat.SetField("camera_latitude", 48.8583)
+    feat.SetField("camera_altitude", 20)
+    feat.SetField("camera_altitudemode", "relativeToGround")
+    feat.SetField("leftfov", -60)
+    feat.SetField("rightfov", 59)
+    feat.SetField("bottomfov", -58)
+    feat.SetField("topfov", 57)
+    feat.SetField("near", 100)
+    feat.SetField("heading", 0)
+    feat.SetField("tilt", 90)
+    feat.SetField("roll", 0)
+    feat.SetField("photooverlay_shape", "rectangle")
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT(2.2945 48.85825)'))
+    lyr.CreateFeature(feat)
+
+    feat.SetField("photooverlay", "http://tile.openstreetmap.org/$[level]/$[x]/$[y].png")
+    feat.SetField("imagepyramid_tilesize", 256)
+    feat.SetField("imagepyramid_maxwidth", 512)
+    feat.SetField("imagepyramid_maxheight", 512)
+    lyr.CreateFeature(feat)
+
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_photooverlay.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<Camera>') == -1 or \
+       data.find('<longitude>2.2946</longitude>') == -1 or \
+       data.find('<latitude>48.8583</latitude>') == -1 or \
+       data.find('<altitude>20</altitude>') == -1 or \
+       data.find('<heading>0</heading>') == -1 or \
+       data.find('<tilt>90</tilt>') == -1 or \
+       data.find('<roll>0</roll>') == -1 or \
+       data.find('<altitudeMode>relativeToGround</altitudeMode>') == -1 or \
+       data.find('<href>http://www.gdal.org/gdalicon.png</href>') == -1 or \
+       data.find('<leftFov>-60</leftFov>') == -1 or \
+       data.find('<rightFov>59</rightFov>') == -1 or \
+       data.find('<bottomFov>-58</bottomFov>') == -1 or \
+       data.find('<topFov>57</topFov>') == -1 or \
+       data.find('<near>100</near>') == -1 or \
+       data.find('2.2945,48.85825,0') == -1 or \
+       data.find('<shape>rectangle</shape>') == -1 or \
+       data.find('<href>http://tile.openstreetmap.org/$[level]/$[x]/$[y].png</href>') == -1 or \
+       data.find('<tileSize>256</tileSize>') == -1 or \
+       data.find('<maxWidth>512</maxWidth>') == -1 or \
+       data.find('<maxHeight>512</maxHeight>') == -1 or \
+       data.find('<gridOrigin>upperLeft</gridOrigin>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing and reading Data element
+
+def ogr_libkml_read_write_data():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_read_write_data.kml")
+    gdal.SetConfigOption('LIBKML_USE_SIMPLEFIELD', 'NO')
+    lyr = ds.CreateLayer('test')
+    gdal.SetConfigOption('LIBKML_USE_SIMPLEFIELD', None)
+    lyr.CreateField(ogr.FieldDefn('foo', ogr.OFTString))
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetField("foo", "bar")
+    feat.SetGeometry(ogr.CreateGeometryFromWkt('POINT(2.2945 48.85825)'))
+    lyr.CreateFeature(feat)
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_read_write_data.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<Data name="foo">') == -1 or \
+       data.find('<value>bar</value>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    ds = ogr.Open("/vsimem/ogr_libkml_read_write_data.kml")
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetNextFeature()
+    if feat.GetField('foo') != 'bar':
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test writing layer as Folder
+
+def ogr_libkml_write_folder():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_folder.kml")
+    lyr = ds.CreateLayer('test', options = [ 'LISTSTYLE_ICON_HREF=http://foo', 'FOLDER=YES' ] )
+    lyr = ds.CreateLayer('test2', options = [ 'FOLDER=YES' ] )
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_folder.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<Style id="test_liststyle">') == -1 or \
+       data.find('<href>http://foo</href>') == -1 or \
+       data.find('<Folder id="test">') == -1 or \
+       data.find('<styleUrl>#test_liststyle</styleUrl>') == -1 or \
+       data.find('<Folder id="test2">') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+    
+###############################################################################
+# Test writing datasource and layer container propreties
+
+def ogr_libkml_write_container_properties():
+
+    if not ogrtest.have_read_libkml:
+        return 'skip'
+
+    ds = ogr.GetDriverByName('LIBKML').CreateDataSource("/vsimem/ogr_libkml_write_container_properties.kml",
+                                 options = [ 'NAME=ds_name', 'DESCRIPTION=ds_description', 'OPEN=1', 'VISIBILITY=1', 'SNIPPET=ds_snippet'])
+    lyr = ds.CreateLayer('test', options = [ 'NAME=lyr_name', 'DESCRIPTION=lyr_description', 'OPEN=0', 'VISIBILITY=0', 'SNIPPET=lyr_snippet'] )
+    ds = None
+
+    f = gdal.VSIFOpenL('/vsimem/ogr_libkml_write_container_properties.kml', 'rb')
+    data = gdal.VSIFReadL(1, 2048, f)
+    data = data.decode('ascii')
+    gdal.VSIFCloseL(f)
+
+    if data.find('<name>ds_name</name>') == -1 or \
+       data.find('<visibility>1</visibility>') == -1 or \
+       data.find('<open>1</open>') == -1 or \
+       data.find('<snippet>ds_snippet</snippet>') == -1 or \
+       data.find('<description>ds_description</description>') == -1 or \
+       data.find('<name>lyr_name</name>') == -1 or \
+       data.find('<visibility>0</visibility>') == -1 or \
+       data.find('<open>0</open>') == -1 or \
+       data.find('<snippet>lyr_snippet</snippet>') == -1 or \
+       data.find('<description>lyr_description</description>') == -1:
+        print(data)
+        gdaltest.post_reason('failure')
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
 #  Cleanup
 
 def ogr_libkml_cleanup():
@@ -1214,6 +1979,7 @@ def ogr_libkml_cleanup():
 
     gdal.Unlink('/vsimem/libkml.kml')
     gdal.Unlink('/vsimem/libkml.kmz')
+    gdal.Unlink('/vsimem/libkml_use_doc_off.kmz')
     gdal.Unlink("/vsimem/ogr_libkml_camera.kml")
     gdal.Unlink("/vsimem/ogr_libkml_write_layer_lookat.kml")
     gdal.Unlink("/vsimem/ogr_libkml_write_layer_camera.kml")
@@ -1224,6 +1990,23 @@ def ogr_libkml_cleanup():
     gdal.Unlink("/vsimem/ogr_libkml_write_phonenumber.kml")
     gdal.Unlink("/vsimem/ogr_libkml_write_region.kml")
     gdal.Unlink("/vsimem/ogr_libkml_write_screenoverlay.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_model.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_read_write_style_read.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_read_write_style_write.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_update.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_update.kmz")
+    gdal.Unlink("/vsimem/ogr_libkml_write_update_dir/doc.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_update_dir")
+    gdal.Unlink("/vsimem/ogr_libkml_write_networklinkcontrol.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_networklinkcontrol.kmz")
+    gdal.Unlink("/vsimem/ogr_libkml_write_networklinkcontrol_dir/doc.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_networklinkcontrol_dir")
+    gdal.Unlink("/vsimem/ogr_libkml_write_liststyle.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_networklink.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_photooverlay.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_read_write_data.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_folder.kml")
+    gdal.Unlink("/vsimem/ogr_libkml_write_container_properties.kml")
 
     # Re-register KML driver if necessary
     if ogrtest.kml_drv is not None:
@@ -1248,6 +2031,8 @@ gdaltest_list = [
     ogr_libkml_check_write_kml,
     ogr_libkml_write_kmz,
     ogr_libkml_check_write_kmz,
+    ogr_libkml_write_kmz_use_doc_off,
+    ogr_libkml_check_write_kmz_use_doc_off,
     ogr_libkml_write_dir,
     ogr_libkml_check_write_dir,
     ogr_libkml_xml_attributes,
@@ -1269,6 +2054,16 @@ gdaltest_list = [
     ogr_libkml_write_phonenumber,
     ogr_libkml_write_region,
     ogr_libkml_write_screenoverlay,
+    ogr_libkml_write_model,
+    ogr_libkml_read_write_style,
+    ogr_libkml_write_update,
+    ogr_libkml_write_networklinkcontrol,
+    ogr_libkml_write_liststyle,
+    ogr_libkml_write_networklink,
+    ogr_libkml_write_photooverlay,
+    ogr_libkml_read_write_data,
+    ogr_libkml_write_folder,
+    ogr_libkml_write_container_properties,
     ogr_libkml_cleanup ]
 
 if __name__ == '__main__':

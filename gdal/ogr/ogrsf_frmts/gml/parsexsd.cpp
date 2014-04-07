@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2005, Frank Warmerdam
+ * Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -365,7 +366,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
                 {
                     if (strncmp(pszType + 4, psIter->pszName, strlen(psIter->pszName)) == 0)
                     {
-                        poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, psIter->eType, nAttributeIndex ) );
+                        poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                            pszElementName, pszElementName, psIter->eType, nAttributeIndex ) );
 
                         nAttributeIndex ++;
 
@@ -393,7 +395,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
             else if (strcmp(pszType, "G:Point_MultiPointPropertyType") == 0 ||
                      strcmp(pszType, "gmgml:Point_MultiPointPropertyType") == 0)
             {
-                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, wkbMultiPoint, nAttributeIndex ) );
+                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                    pszElementName, pszElementName, wkbMultiPoint, nAttributeIndex ) );
 
                 nAttributeIndex ++;
                 continue;
@@ -401,7 +404,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
             else if (strcmp(pszType, "G:LineString_MultiLineStringPropertyType") == 0 ||
                      strcmp(pszType, "gmgml:LineString_MultiLineStringPropertyType") == 0)
             {
-                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, wkbMultiLineString, nAttributeIndex ) );
+                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                    pszElementName, pszElementName, wkbMultiLineString, nAttributeIndex ) );
 
                 nAttributeIndex ++;
                 continue;
@@ -410,7 +414,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
                      strcmp(pszType, "gmgml:Polygon_MultiPolygonPropertyType") == 0 ||
                      strcmp(pszType, "gmgml:Polygon_Surface_MultiSurface_CompositeSurfacePropertyType") == 0)
             {
-                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, wkbMultiPolygon, nAttributeIndex ) );
+                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                    pszElementName, pszElementName, wkbMultiPolygon, nAttributeIndex ) );
 
                 nAttributeIndex ++;
                 continue;
@@ -419,7 +424,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
             /* ERDAS Apollo stuff (like in http://apollo.erdas.com/erdas-apollo/vector/WORLDWIDE?SERVICE=WFS&VERSION=1.0.0&REQUEST=DescribeFeatureType&TYPENAME=wfs:cntry98) */
             else if (strcmp(pszType, "wfs:MixedPolygonPropertyType") == 0)
             {
-                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, wkbMultiPolygon, nAttributeIndex ) );
+                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                    pszElementName, pszElementName, wkbMultiPolygon, nAttributeIndex ) );
 
                 nAttributeIndex ++;
                 continue;
@@ -493,7 +499,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
                         }
                         else
                         {
-                            poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, psIter->eType, nAttributeIndex ) );
+                            poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                                pszElementName, pszElementName, psIter->eType, nAttributeIndex ) );
 
                             nAttributeIndex ++;
                         }
@@ -537,7 +544,8 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
                 CheckMinMaxOccursCardinality(psComplexTypeSequence) &&
                 strcmp(CPLGetXMLValue( psComplexTypeSequenceElement, "ref", "" ), "gml:_Geometry") == 0 )
             {
-                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( pszElementName, wkbUnknown, nAttributeIndex ) );
+                poClass->AddGeometryProperty( new GMLGeometryPropertyDefn(
+                    pszElementName, pszElementName, wkbUnknown, nAttributeIndex ) );
 
                 nAttributeIndex ++;
 
@@ -578,7 +586,7 @@ GMLFeatureClass* GMLParseFeatureType(CPLXMLNode *psSchemaNode,
     if( poClass->GetGeometryPropertyCount() == 0 &&
         bGotUnrecognizedType )
     {
-        poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( "", wkbUnknown ) );
+        poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( "", "", wkbUnknown ) );
     }
 
 /* -------------------------------------------------------------------- */

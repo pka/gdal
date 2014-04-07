@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 1999,  Les Technologies SoftMap Inc.
+ * Copyright (c) 2007-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -385,6 +386,7 @@ void CPL_DLL RegisterOGRTAB();
 void CPL_DLL RegisterOGRMIF();
 void CPL_DLL RegisterOGROGDI();
 void CPL_DLL RegisterOGRODBC();
+void CPL_DLL RegisterOGRWAsP();
 void CPL_DLL RegisterOGRPG();
 void CPL_DLL RegisterOGRMSSQLSpatial();
 void CPL_DLL RegisterOGRMySQL();

@@ -6,7 +6,7 @@
  * Author:   Even Rouault, even.rouault at mines-paris.org
  *
  ******************************************************************************
- * Copyright (c) 2007, Even Rouault
+ * Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -523,6 +523,7 @@ int VSIGZipHandle::gzseek( vsi_l_offset offset, int whence )
     vsi_l_offset original_offset = offset;
     int original_nWhence = whence;
 
+    z_eof = 0;
     if (ENABLE_DEBUG) CPLDebug("GZIP", "Seek(" CPL_FRMT_GUIB ",%d)", offset, whence);
 
     if (transparent)
@@ -1689,7 +1690,11 @@ int VSIZipReader::GotoFirstFile()
 int VSIZipReader::GotoFileOffset(VSIArchiveEntryFileOffset* pOffset)
 {
     VSIZipEntryFileOffset* pZipEntryOffset = (VSIZipEntryFileOffset*)pOffset;
-    cpl_unzGoToFilePos(unzF, &(pZipEntryOffset->file_pos));
+    if( cpl_unzGoToFilePos(unzF, &(pZipEntryOffset->file_pos)) != UNZ_OK )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "GotoFileOffset failed");
+        return FALSE;
+    }
 
     SetInfo();
 
@@ -1896,12 +1901,23 @@ VSIVirtualHandle* VSIZipFilesystemHandler::Open( const char *pszFilename,
 
     unzFile unzF = ((VSIZipReader*)poReader)->GetUnzFileHandle();
 
-    cpl_unzOpenCurrentFile(unzF);
+    if( cpl_unzOpenCurrentFile(unzF) != UNZ_OK )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "cpl_unzOpenCurrentFile() failed");
+        delete poReader;
+        return NULL;
+    }
 
     uLong64 pos = cpl_unzGetCurrentFileZStreamPos(unzF);
 
     unz_file_info file_info;
-    cpl_unzGetCurrentFileInfo (unzF, &file_info, NULL, 0, NULL, 0, NULL, 0);
+    if( cpl_unzGetCurrentFileInfo (unzF, &file_info, NULL, 0, NULL, 0, NULL, 0) != UNZ_OK )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "cpl_unzGetCurrentFileInfo() failed");
+        cpl_unzCloseCurrentFile(unzF);
+        delete poReader;
+        return NULL;
+    }
 
     cpl_unzCloseCurrentFile(unzF);
 
@@ -2229,8 +2245,8 @@ int VSIZipWriteHandle::Eof()
 
 int VSIZipWriteHandle::Flush()
 {
-    CPLError(CE_Failure, CPLE_NotSupported,
-             "VSIFFlushL() is not supported on writable Zip files");
+    /*CPLError(CE_Failure, CPLE_NotSupported,
+             "VSIFFlushL() is not supported on writable Zip files");*/
     return 0;
 }
 

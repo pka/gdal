@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2000, Atlantis Scientific Inc.
+ * Copyright (c) 2009-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -2160,9 +2161,13 @@ ProcessData( VSILFILE *fp, int fileid, CeosSARVolume_t *sar, int max_records,
             max_records--;
         if(max_bytes > 0)
         {
-            max_bytes -= record->Length;
-            if(max_bytes < 0)
+            if( record->Length <= max_bytes )
+                max_bytes -= record->Length;
+            else {
+                CPLDebug( "SAR_CEOS", "Partial record found.  %d > " CPL_FRMT_GUIB,
+                          record->Length, max_bytes );
                 max_bytes = 0;
+            }
         }
     }
 

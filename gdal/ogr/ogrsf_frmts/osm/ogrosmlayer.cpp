@@ -6,7 +6,7 @@
  * Author:   Even Rouault, <even dot rouault at mines dash paris dot org>
  *
  ******************************************************************************
- * Copyright (c) 2012, Even Rouault
+ * Copyright (c) 2012-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,9 +45,10 @@ CPL_CVSID("$Id$");
 /************************************************************************/
 
 
-OGROSMLayer::OGROSMLayer(OGROSMDataSource* poDS, const char* pszName )
+OGROSMLayer::OGROSMLayer(OGROSMDataSource* poDS, int nIdxLayer, const char* pszName )
 {
     this->poDS = poDS;
+    this->nIdxLayer = nIdxLayer;
 
     poFeatureDefn = new OGRFeatureDefn( pszName );
     poFeatureDefn->Reference();
@@ -235,7 +236,7 @@ OGRFeature *OGROSMLayer::GetNextFeature()
             }
 
             /* Read some more data and accumulate features */
-            poDS->ParseNextChunk();
+            poDS->ParseNextChunk(nIdxLayer);
 
             if ( nFeatureArraySize == 0 )
             {
@@ -265,7 +266,7 @@ OGRFeature *OGROSMLayer::GetNextFeature()
         {
             while(TRUE)
             {
-                int bRet = poDS->ParseNextChunk();
+                int bRet = poDS->ParseNextChunk(nIdxLayer);
                 if (nFeatureArraySize != 0)
                     break;
                 if (bRet == FALSE)

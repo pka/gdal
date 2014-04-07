@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2010, Tamas Szekeres
+ * Copyright (c) 2010-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -694,7 +695,10 @@ int OGRMSSQLSpatialDataSource::Open( const char * pszNewName, int bUpdate,
             }
         }
         else
-            bUseGeometryColumns = FALSE;
+        {
+            /* probably the table is missing at all */
+            InitializeMetadataTables();
+        }
     }
 
     /* Query catalog for tables having geometry columns */

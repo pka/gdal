@@ -8,6 +8,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2005, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -866,7 +867,7 @@ int VSIFPutcL( int nChar, VSILFILE * fp )
  * 
  * @return TRUE in case of success.
  *
- * @since GDAL 2.0
+ * @since GDAL 1.11
  */
 
 int VSIIngestFile( VSILFILE* fp,

@@ -8,7 +8,7 @@
 # Author:   Even Rouault <even dot rouault @ mines-paris dot org>
 # 
 ###############################################################################
-# Copyright (c) 2008, Even Rouault <even dot rouault @ mines-paris dot org>
+# Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1929,7 +1929,7 @@ def test_ogr2ogr_49_bis():
     expected_lines = [
 """<?xml version="1.0" encoding="utf-8" ?>""",
 """<kml xmlns="http://www.opengis.net/kml/2.2">""",
-"""<Document>""",
+"""<Document id="root_doc">""",
 """<Folder><name>grid</name>""",
 """  <Placemark>""",
 """        <name>440750.000</name>""",

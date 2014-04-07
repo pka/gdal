@@ -9,6 +9,7 @@
 # 
 ###############################################################################
 # Copyright (c) 2003, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2009-2014, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Library General Public
@@ -1564,6 +1565,16 @@ def ogr_vrt_27():
 # Invalid VRT testing
 
 def ogr_vrt_28():
+
+    ds = ogr.Open("<OGRVRTDataSource></foo>")
+    if ds is not None:
+        return 'fail'
+
+    gdal.FileFromMemBuffer('/vsimem/ogr_vrt_28_invalid.vrt', "<bla><OGRVRTDataSource></OGRVRTDataSource></bla>")
+    ds = ogr.Open("/vsimem/ogr_vrt_28_invalid.vrt")
+    if ds is not None:
+        return 'fail'
+    gdal.Unlink("/vsimem/ogr_vrt_28_invalid.vrt")
 
     ds = ogr.Open("data/invalid.vrt")
     if ds is None:

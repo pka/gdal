@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2000, Frank Warmerdam
+ * Copyright (c) 2007-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -1720,20 +1721,23 @@ PNGDataset::CreateCopy( const char * pszFilename, GDALDataset *poSrcDS,
 /* -------------------------------------------------------------------- */
 /*      Re-open dataset, and copy any auxilary pam information.         */
 /* -------------------------------------------------------------------- */
-    GDALOpenInfo oOpenInfo(pszFilename, GA_ReadOnly);
 
     /* If outputing to stdout, we can't reopen it, so we'll return */
     /* a fake dataset to make the caller happy */
-    CPLPushErrorHandler(CPLQuietErrorHandler);
-    PNGDataset *poDS = (PNGDataset*) PNGDataset::Open( &oOpenInfo );
-    CPLPopErrorHandler();
-    if( poDS )
+    if( CSLTestBoolean(CPLGetConfigOption("GDAL_OPEN_AFTER_COPY", "YES")) )
     {
-        poDS->CloneInfo( poSrcDS, GCIF_PAM_DEFAULT );
-        return poDS;
-    }
+        GDALOpenInfo oOpenInfo(pszFilename, GA_ReadOnly);
 
-    CPLErrorReset();
+        CPLPushErrorHandler(CPLQuietErrorHandler);
+        PNGDataset *poDS = (PNGDataset*) PNGDataset::Open( &oOpenInfo );
+        CPLPopErrorHandler();
+        if( poDS )
+        {
+            poDS->CloneInfo( poSrcDS, GCIF_PAM_DEFAULT );
+            return poDS;
+        }
+        CPLErrorReset();
+    }
 
     PNGDataset* poPNG_DS = new PNGDataset();
     poPNG_DS->nRasterXSize = nXSize;

@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2010, Chaitanya kumar CH
+ * Copyright (c) 2010-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -269,11 +270,12 @@ static void CorrectURLs( CPLXMLNode * psRoot, const char *pszURL )
                               && pszURL[nPathLen - 1] != '\\';
                  nPathLen--);
 
-            if( strncmp( pszURL, psChild->psChild->pszValue, nPathLen ) != 0 )
+            const char* pszDash = strchr( psChild->psChild->pszValue, '#' );
+            if( pszDash != NULL &&
+                strncmp( pszURL, psChild->psChild->pszValue, nPathLen ) != 0 )
             {
             //different path
-                int nURLLen = strchr( psChild->psChild->pszValue, '#' ) -
-                              psChild->psChild->pszValue;
+                int nURLLen = pszDash - psChild->psChild->pszValue;
                 char *pszURLWithoutID = (char *)CPLMalloc( (nURLLen+1) * sizeof(char));
                 strncpy( pszURLWithoutID, psChild->psChild->pszValue, nURLLen );
                 pszURLWithoutID[nURLLen] = '\0';

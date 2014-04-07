@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2004, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2009-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -503,7 +504,7 @@ class OGRSQLiteSelectLayer : public OGRSQLiteLayer
     virtual OGRErr      ResetStatement();
 
     OGRSQLiteLayer     *GetBaseLayer(size_t& i);
-    int                 RebuildSQLWithSpatialClause();
+    int                 BuildSQL();
 
     int                 bAllowResetReadingEvenIfIndexAtZero;
  
@@ -522,6 +523,7 @@ class OGRSQLiteSelectLayer : public OGRSQLiteLayer
 
     virtual void        SetSpatialFilter( OGRGeometry * poGeom ) { SetSpatialFilter(0, poGeom); }
     virtual void        SetSpatialFilter( int iGeomField, OGRGeometry * );
+    virtual OGRErr      SetAttributeFilter( const char * );
 
     virtual int         TestCapability( const char * );
 

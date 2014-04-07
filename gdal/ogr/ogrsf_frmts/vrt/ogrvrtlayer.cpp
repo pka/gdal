@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2003, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2009-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -542,8 +543,31 @@ int OGRVRTLayer::FullInitialize()
     if( CSLTestBoolean(CPLGetXMLValue( psLTree, "SrcDataSource.relativetoVRT", 
                                        "0")) )
     {
-        pszSrcDSName = CPLStrdup(
-            CPLProjectRelativeFilename( osVRTDirectory, pszSrcDSName ) );
+        static const char* apszPrefixes[] = { "CSV:", "GPSBABEL:" };
+        int bDone = FALSE;
+        for( size_t i = 0; i < sizeof(apszPrefixes) / sizeof(apszPrefixes[0]); i ++)
+        {
+            const char* pszPrefix = apszPrefixes[i];
+            if( EQUALN(pszSrcDSName, pszPrefix, strlen(pszPrefix)) )
+            {
+                const char* pszLastPart = strrchr(pszSrcDSName, ':') + 1;
+                /* CSV:z:/foo.xyz */
+                if( (pszLastPart[0] == '/' || pszLastPart[0] == '\\') &&
+                    pszLastPart - pszSrcDSName >= 3 && pszLastPart[-3] == ':' )
+                    pszLastPart -= 2;
+                CPLString osPrefix(pszSrcDSName);
+                osPrefix.resize(pszLastPart - pszSrcDSName);
+                pszSrcDSName = CPLStrdup( (osPrefix +
+                    CPLProjectRelativeFilename( osVRTDirectory, pszLastPart )).c_str() );
+                bDone = TRUE;
+                break;
+            }
+        }
+        if( !bDone )
+        {
+            pszSrcDSName = CPLStrdup(
+                CPLProjectRelativeFilename( osVRTDirectory, pszSrcDSName ) );
+        }
     }
     else
     {
@@ -1019,8 +1043,7 @@ try_again:
 error:
     bError = TRUE;
     CPLFree( pszSrcDSName );
-    if( poFeatureDefn )
-        poFeatureDefn->Release();
+    poFeatureDefn->Release();
     poFeatureDefn = new OGRFeatureDefn( osName );
     poFeatureDefn->Reference();
     return FALSE;

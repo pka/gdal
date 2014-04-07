@@ -41,8 +41,7 @@ pixel size, a transformation matrix, or a list of GCPs.</p>
 <p>If no georeferencing
 information is available in the TIFF file itself, GDAL will also check for,
 and use an ESRI <a href="frmt_various.html#WLD">world file</a> with the
-extention .tfw, .tifw/.tiffw or .wld, as well as a MapInfo .tab file (only control
-points used, Coordsys ignored).</p>
+extension .tfw, .tifw/.tiffw or .wld, as well as a MapInfo .tab file.</p>
 
 <p>GDAL can read and write the <i>RPCCoefficientTag</i> as described in the <a href="http://geotiff.maptools.org/rpc_prop.html">
 RPCs in GeoTIFF</a> proposed extension. The tag is written only for
@@ -134,7 +133,7 @@ stored the EXIF metadata domain.</p>
 
 <h2>Color Profile Metadata</h2>
 
-<p>Starting with GDAL 2.0, GDAL can deal with the following color profile metadata in the COLOR_PROFILE domain:</p>
+<p>Starting with GDAL 1.11, GDAL can deal with the following color profile metadata in the COLOR_PROFILE domain:</p>
 <ul>
 <li>SOURCE_ICC_PROFILE (Base64 encoded ICC profile embedded in file. If available, other tags are ignored.)</li>
 <li>SOURCE_PRIMARIES_RED (xyY in "x,y,1" format for red primary.)</li>

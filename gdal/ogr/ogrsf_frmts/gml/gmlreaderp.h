@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2002, Frank Warmerdam
+ * Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -452,6 +453,8 @@ private:
     int           m_bFaceHoleNegative;
     
     int           m_bSetWidthFlag;
+    
+    int           m_bReportAllAttributes;
 
     int           ParseXMLHugeFile( const char *pszOutputFilename, 
                                     const int bSqliteIsTempFile,
@@ -534,6 +537,8 @@ public:
     int         GetFilteredClassIndex() { return m_nFilteredClassIndex; }
 
     int         IsSequentialLayers() const { return m_bSequentialLayers == TRUE; }
+    
+    int         ReportAllAttributes() const { return m_bReportAllAttributes; }
 
     static void* hMutex;
 };

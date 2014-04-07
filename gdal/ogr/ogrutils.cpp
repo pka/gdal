@@ -8,6 +8,7 @@
  *
  ******************************************************************************
  * Copyright (c) 1999, Frank Warmerdam
+ * Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,6 +29,7 @@
  * DEALINGS IN THE SOFTWARE.
  ****************************************************************************/
 
+#include "cpl_conv.h"
 #include "cpl_vsi.h"
 
 #include <ctype.h>
@@ -728,7 +730,7 @@ int OGRGeneralCmdLineProcessor( int nArgc, char ***ppapszArgv, int nOptions )
 /* -------------------------------------------------------------------- */
         else if( EQUAL(papszArgv[iArg],"--locale") && iArg < nArgc-1 )
         {
-            setlocale( LC_ALL, papszArgv[++iArg] );
+            CPLsetlocale( LC_ALL, papszArgv[++iArg] );
         }
 
 /* -------------------------------------------------------------------- */

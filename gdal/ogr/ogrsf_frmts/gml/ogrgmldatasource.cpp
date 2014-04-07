@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2002, Frank Warmerdam <warmerdam@pobox.com>
+ * Copyright (c) 2007-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -1176,7 +1177,7 @@ OGRGMLLayer *OGRGMLDataSource::TranslateGMLSchema( GMLFeatureClass *poClass )
     for( iField = 0; iField < poClass->GetGeometryPropertyCount(); iField++ )
     {
         GMLGeometryPropertyDefn *poProperty = poClass->GetGeometryProperty( iField );
-        OGRGeomFieldDefn oField( poProperty->GetSrcElement(), (OGRwkbGeometryType)poProperty->GetType() );
+        OGRGeomFieldDefn oField( poProperty->GetName(), (OGRwkbGeometryType)poProperty->GetType() );
         if( poClass->GetGeometryPropertyCount() == 1 && poClass->GetFeatureCount() == 0 )
         {
             oField.SetType(wkbUnknown);

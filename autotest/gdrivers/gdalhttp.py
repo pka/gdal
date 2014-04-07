@@ -8,6 +8,7 @@
 # 
 ###############################################################################
 # Copyright (c) 2007, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2009-2012, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -60,11 +61,11 @@ def http_1():
     except:
         gdaltest.dods_drv = None
 
-    tst = gdaltest.GDALTest( 'GIF','http://home.gdal.org/~warmerda/frank.gif',
-                             1, 35415, filename_absolute = 1 )
+    tst = gdaltest.GDALTest( 'PNG','http://gdal.org/gdalicon.png',
+                             1, 7617, filename_absolute = 1 )
     ret = tst.testOpen()
     if ret == 'fail':
-        conn = gdaltest.gdalurlopen('http://home.gdal.org/~warmerda/frank.gif')
+        conn = gdaltest.gdalurlopen('http://gdal.org/gdalicon.png')
         if conn is None:
             print('cannot open URL')
             return 'skip'

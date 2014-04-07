@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2000, Frank Warmerdam
+ * Copyright (c) 2009-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -149,7 +150,7 @@ void CPL_STDCALL GDALSetDescription( GDALMajorObjectH hObject, const char *pszNe
  * 
  * @return NULL or a string list. Must be freed with CSLDestroy()
  *
- * @since GDAL 2.0
+ * @since GDAL 1.11
  */
 
 char **GDALMajorObject::GetMetadataDomainList()
@@ -173,7 +174,7 @@ char **GDALMajorObject::GetMetadataDomainList()
  *
  * @return NULL or a string list. Must be freed with CSLDestroy()
  *
- * @since GDAL 2.0
+ * @since GDAL 1.11
  */
 
 char **GDALMajorObject::BuildMetadataDomainList(char** papszList, int bCheckNonEmpty, ...)
@@ -205,7 +206,7 @@ char **GDALMajorObject::BuildMetadataDomainList(char** papszList, int bCheckNonE
  *
  * @see GDALMajorObject::GetMetadataDomainList()
  *
- * @since GDAL 2.0
+ * @since GDAL 1.11
  */ 
 
 char ** CPL_STDCALL 

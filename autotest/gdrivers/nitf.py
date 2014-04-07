@@ -9,6 +9,7 @@
 # 
 ###############################################################################
 # Copyright (c) 2003, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -928,7 +929,50 @@ def nitf_38():
         print(cs)
         gdaltest.post_reason( 'bad checksum for overview of image of 998th subdataset' )
         return 'fail'
+
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('tmp/nitf38.vrt', ds)
+    out_ds = None
     ds = None
+
+    ds = gdal.Open('tmp/nitf38.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/nitf38.vrt')
+    if cs != expected_cs:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+
+    ds = gdal.Open( 'NITF_IM:998:%s/tmp/nitf38.ntf' % os.getcwd() )
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('%s/tmp/nitf38.vrt' % os.getcwd(), ds)
+    out_ds = None
+    ds = None
+
+    ds = gdal.Open('tmp/nitf38.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/nitf38.vrt')
+    if cs != expected_cs:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
+
+    ds = gdal.Open( 'NITF_IM:998:%s/tmp/nitf38.ntf' % os.getcwd() )
+    out_ds = gdal.GetDriverByName('VRT').CreateCopy('tmp/nitf38.vrt', ds)
+    out_ds = None
+    ds = None
+
+    ds = gdal.Open('tmp/nitf38.vrt')
+    cs = ds.GetRasterBand(1).Checksum()
+    ds = None
+
+    gdal.Unlink('tmp/nitf38.vrt')
+    if cs != expected_cs:
+        gdaltest.post_reason('failure')
+        print(cs)
+        return 'fail'
 
     return 'success'
 

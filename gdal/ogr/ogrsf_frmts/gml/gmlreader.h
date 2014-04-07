@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2002, Frank Warmerdam
+ * Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -103,13 +104,17 @@ public:
 
 class CPL_DLL GMLGeometryPropertyDefn
 {
+    char       *m_pszName;
     char       *m_pszSrcElement;
     int         m_nGeometryType;
     int         m_nAttributeIndex;
     
 public:
-        GMLGeometryPropertyDefn( const char *pszName, int nType, int nAttributeIndex = -1 );
+        GMLGeometryPropertyDefn( const char *pszName, const char *pszSrcElement,
+                                 int nType, int nAttributeIndex = -1 );
        ~GMLGeometryPropertyDefn();
+
+        const char *GetName() const { return m_pszName; } 
 
         int GetType() const { return m_nGeometryType; }
         void SetType(int nType) { m_nGeometryType = nType; }

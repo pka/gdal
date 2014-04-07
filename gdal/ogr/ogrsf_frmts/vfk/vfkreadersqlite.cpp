@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2012-2014, Martin Landa <landa.martin gmail.com>
+ * Copyright (c) 2012-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -53,7 +54,7 @@ VFKReaderSQLite::VFKReaderSQLite(const char *pszFilename) : VFKReader(pszFilenam
     const char *pszDbNameConf;
     CPLString   pszDbName;
     CPLString   osCommand;
-    VSIStatBufL sStatBuf;
+    VSIStatBufL sStatBufDb, sStatBufVfk;
     
     /* open tmp SQLite DB (re-use DB file if already exists) */
     pszDbNameConf = CPLGetConfigOption("OGR_VFK_DB_NAME", NULL);
@@ -74,7 +75,7 @@ VFKReaderSQLite::VFKReaderSQLite(const char *pszFilename) : VFKReader(pszFilenam
 	m_bSpatial = FALSE;   /* store also geometry in DB */
     
     m_bNewDb = TRUE;
-    if (VSIStatL(pszDbName, &sStatBuf ) == 0) {
+    if (VSIStatL(pszDbName, &sStatBufDb) == 0) {
 	if (CSLTestBoolean(CPLGetConfigOption("OGR_VFK_DB_OVERWRITE", "NO"))) {
 	    m_bNewDb = TRUE;     /* overwrite existing DB */
             CPLDebug("OGR-VFK", "Internal DB (%s) already exists and will be overwritten",
@@ -82,15 +83,28 @@ VFKReaderSQLite::VFKReaderSQLite(const char *pszFilename) : VFKReader(pszFilenam
 	    VSIUnlink(pszDbName);
 	}
 	else {
-	    m_bNewDb = FALSE;    /* re-use exising DB */
+            if (VSIStatL(pszFilename, &sStatBufVfk) == 0 &&
+                sStatBufVfk.st_mtime > sStatBufDb.st_mtime) {
+                CPLDebug("OGR-VFK",
+                         "Found %s but ignoring because it appears\n"
+                         "be older than the associated VFK file.",
+                         pszDbName.c_str());
+                m_bNewDb = TRUE;
+                VSIUnlink(pszDbName);
+            }
+            else {
+                m_bNewDb = FALSE;    /* re-use exising DB */
+            }
 	}
     }
+    
     /*
-    else {
-      	CPLError(CE_Warning, CPLE_AppDefined, 
-                 "Creating internal SQLite DB. Reading VFK data may take some time...");
+    if (m_bNewDb) {
+      CPLError(CE_Warning, CPLE_AppDefined, 
+               "INFO: No internal SQLite DB found. Reading VFK data may take some time...");
     }
     */
+
     CPLDebug("OGR-VFK", "New DB: %s Spatial: %s",
 	     m_bNewDb ? "yes" : "no", m_bSpatial ? "yes" : "no");
 

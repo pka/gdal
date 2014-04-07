@@ -8,6 +8,7 @@
  *
  ******************************************************************************
  * Copyright (c) 1999, Frank Warmerdam
+ * Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -294,6 +295,8 @@ class CPL_DLL OGRLineString : public OGRCurve
     virtual void StartPoint(OGRPoint *) const;
     virtual void EndPoint(OGRPoint *) const;
     virtual void Value( double, OGRPoint * ) const;
+    virtual double Project(const OGRPoint *) const;
+    virtual OGRLineString* getSubLine(double, double, int) const;
     
     // ILineString methods
     int         getNumPoints() const { return nPointCount; }

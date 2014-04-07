@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2002, Frank Warmerdam
+ * Copyright (c) 2010-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -895,7 +896,7 @@ int NASReader::PrescanForSchema( int bGetExtents, int bAnalyzeSRSPerFeature )
                 OGREnvelope sEnvelope;
 
                 if( poClass->GetGeometryPropertyCount() == 0 )
-                    poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( "", wkbUnknown ) );
+                    poClass->AddGeometryProperty( new GMLGeometryPropertyDefn( "", "", wkbUnknown ) );
 
                 OGRwkbGeometryType eGType = (OGRwkbGeometryType) 
                     poClass->GetGeometryProperty(0)->GetType();

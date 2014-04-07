@@ -9,6 +9,7 @@
 # 
 ###############################################################################
 # Copyright (c) 2004, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Library General Public
@@ -863,6 +864,20 @@ def ogr_pg_19():
         gdaltest.post_reason( 'Extents do not match' )
         print(extent)
         return 'fail'
+
+    estimated_extent = layer.GetExtent(force = 0)
+    if not gdaltest.pg_has_postgis:
+        # The OGRLayer default implementation in force = 0 returns error
+        if estimated_extent != (0, 0, 0, 0):
+            gdaltest.post_reason( 'Wrong estimated extent' )
+            print(extent)
+            return 'fail'
+    else:
+        # Better testing needed ?
+        if estimated_extent == (0, 0, 0, 0):
+            gdaltest.post_reason( 'Wrong estimated extent' )
+            print(extent)
+            return 'fail'
 
     return 'success'
 

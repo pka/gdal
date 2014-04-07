@@ -9,6 +9,8 @@
 # 
 ###############################################################################
 # Copyright (c) 2003, Frank Warmerdam <warmerdam@pobox.com>
+# Copyright (c) 2009-2013, Even Rouault <even dot rouault at mines-paris dot org>
+# Copyright (c) 2014, Kyle Shannon <kyle at pobox dot com>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -658,6 +660,44 @@ def osr_proj4_16():
             return 'fail'
     return 'success'
 
+###############################################################################
+# Test unit parsing for name assignment
+#
+def osr_proj4_17():
+
+    units = (('km', 'kilometre'),
+             ('m', 'Meter'),
+             ('dm', 'Decimeter'),
+             ('cm', 'Centimeter'),
+             ('mm', 'Millimeter'),
+             ('kmi', 'Nautical_Mile_International'),
+             ('in', 'Inch_International'),
+             ('ft', 'Foot (International)'),
+             ('yd', 'Yard_International'),
+             ('mi', 'Statute_Mile_International'),
+             ('fath', 'Fathom_International'),
+             ('ch', 'Chain_International'),
+             ('link', 'Link_International'),
+             ('us-in', 'Inch_US_Surveyor'),
+             ('us-ft', 'Foot_US'),
+             ('us-yd', 'Yard_US_Surveyor'),
+             ('us-ch', 'Chain_US_Surveyor'),
+             ('us-mi', 'Statute_Mile_US_Surveyor'),
+             ('ind-yd', 'Yard_Indian'),
+             ('ind-ft', 'Foot_Indian'),
+             ('ind-ch', 'Chain_Indian'))
+
+    srs = osr.SpatialReference()
+    for u in units:
+        if srs.ImportFromProj4('+proj=utm +zone=11 +datum=WGS84 +units=%s' % u[0] ) != 0:
+            return 'fail'
+        unit_name = srs.GetLinearUnitsName()
+        if unit_name != u[1]:
+            gdaltest.post_reason('Did not get expected unit name: %s vs %s' % (str(u), str(unit_name)))
+            return 'fail'
+    return 'success'
+
+
 gdaltest_list = [ 
     osr_proj4_1,
     osr_proj4_2,
@@ -674,7 +714,8 @@ gdaltest_list = [
     osr_proj4_13,
     osr_proj4_14,
     osr_proj4_15,
-    osr_proj4_16]
+    osr_proj4_16,
+    osr_proj4_17]
 
 if __name__ == '__main__':
 

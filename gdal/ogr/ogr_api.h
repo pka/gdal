@@ -7,6 +7,7 @@
  *
  ******************************************************************************
  * Copyright (c) 2002, Frank Warmerdam
+ * Copyright (c) 2008-2013, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -564,6 +565,9 @@ int CPL_DLL OGR_ST_GetRGBFromString(OGRStyleToolH hST, const char *pszColor,
 
 OGRStyleTableH  CPL_DLL OGR_STBL_Create( void ) CPL_WARN_UNUSED_RESULT;
 void    CPL_DLL OGR_STBL_Destroy( OGRStyleTableH hSTBL ); 
+int     CPL_DLL OGR_STBL_AddStyle( OGRStyleTableH hStyleTable,
+                                   const char *pszName,
+                                   const char *pszStyleString);
 int     CPL_DLL OGR_STBL_SaveStyleTable( OGRStyleTableH hStyleTable,
                                          const char *pszFilename );
 int     CPL_DLL OGR_STBL_LoadStyleTable( OGRStyleTableH hStyleTable,

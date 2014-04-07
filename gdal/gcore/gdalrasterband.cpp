@@ -8,6 +8,7 @@
  *
  ******************************************************************************
  * Copyright (c) 1998, Frank Warmerdam
+ * Copyright (c) 2007-2014, Even Rouault <even dot rouault at mines-paris dot org>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -5013,7 +5014,7 @@ void GDALRasterBand::ReportError(CPLErr eErrClass, int err_no, const char *fmt, 
  * @return a virtual memory object that must be unreferenced by CPLVirtualMemFree(),
  *         or NULL in case of failure.
  *
- * @since GDAL 2.0
+ * @since GDAL 1.11
  */
 
 CPLVirtualMem  *GDALRasterBand::GetVirtualMemAuto( GDALRWFlag eRWFlag,

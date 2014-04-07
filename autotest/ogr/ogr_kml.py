@@ -9,6 +9,7 @@
 # 
 ###############################################################################
 # Copyright (c) 2007, Matuesz Loskot <mateusz@loskot.net>
+# Copyright (c) 2008-2014, Even Rouault <even dot rouault at mines-paris dot org>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -747,7 +748,7 @@ def ogr_kml_write_schema():
 
     expected_content="""<?xml version="1.0" encoding="utf-8" ?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
+<Document id="root_doc">
 <Schema name="lyr" id="lyr">
     <SimpleField name="strfield" type="string"></SimpleField>
     <SimpleField name="intfield" type="int"></SimpleField>
@@ -783,7 +784,7 @@ def ogr_kml_empty_layer():
 
     expected_content="""<?xml version="1.0" encoding="utf-8" ?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
+<Document id="root_doc">
 <Folder><name>empty</name>
 </Folder>
 </Document></kml>"""
@@ -813,7 +814,7 @@ def ogr_kml_two_layers():
     # FIXME: the schema for lyr should be written before the first Folter for XML compliance
     expected_content="""<?xml version="1.0" encoding="utf-8" ?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
+<Document id="root_doc">
 <Folder><name>empty</name>
 </Folder>
 <Folder><name>lyr</name>
