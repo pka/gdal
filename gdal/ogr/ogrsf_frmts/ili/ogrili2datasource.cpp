@@ -98,7 +98,7 @@ int OGRILI2DataSource::Open( const char * pszNewName, int bTestOpen )
     pszName = CPLStrdup( filenames[0] );
 
     if( CSLCount(filenames) > 1 )
-        modelFilename = CPLStrdup( filenames[1] );
+        modelFilename = filenames[1];
 
 /* -------------------------------------------------------------------- */
 /*      Open the source file.                                           */
@@ -252,6 +252,7 @@ int OGRILI2DataSource::Create( const char *pszFilename,
     const char* basketName = poImdReader->mainBasketName.c_str();
     VSIFPrintfL(fpOutput, "<%s BID=\"%s\">\n", basketName, basketName);
 
+    CSLDestroy( filenames );
     return TRUE;
 }
 
