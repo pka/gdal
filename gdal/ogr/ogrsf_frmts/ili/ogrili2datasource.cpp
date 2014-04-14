@@ -222,6 +222,7 @@ int OGRILI2DataSource::Create( const char *pszFilename,
         CPLError( CE_Failure, CPLE_OpenFailed,
                   "Failed to create XTF file %s.",
                   pszName );
+        CSLDestroy(filenames);
         return FALSE;
     }
 
