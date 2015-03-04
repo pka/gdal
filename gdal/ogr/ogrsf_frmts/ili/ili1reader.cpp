@@ -264,15 +264,20 @@ int ILI1Reader::ReadTable(CPL_UNUSED const char *layername) {
       firsttok = CSLGetField(tokens, 0);
       if (EQUAL(firsttok, "OBJE"))
       {
-        //Check for features spread over multiple objects
-        if (featureDef->GetGeomType() == wkbPolygon) //FIXME: Multi-geom support
+        // Handle Interlis geometry helper tables
+        if (curLayer->GetGeomFieldInfos().empty())
         {
-          //Multiple polygon rings
-          feature = curLayer->GetFeatureRef(atol(CSLGetField(tokens, 2)));
-        }
-        else if (featureDef->GetGeomType() == wkbGeometryCollection)
-        {
-          //AREA lines spread over mutltiple objects
+          //Check for features spread over multiple objects
+          if (featureDef->GetGeomType() == wkbPolygon)
+          {
+            //Multiple polygon rings
+            feature = curLayer->GetFeatureRef(atol(CSLGetField(tokens, 2)));
+          }
+          else if (featureDef->GetGeomType() == wkbGeometryCollection)
+          {
+            //AREA lines spread over mutltiple objects
+            //Append to current feature
+          }
         }
         else
         {
