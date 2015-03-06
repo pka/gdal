@@ -505,6 +505,7 @@ void OGRILI1Layer::PolygonizeAreaLayer( OGRILI1Layer* poAreaLineLayer, int nArea
 
     //polygonize lines
     CPLDebug( "OGR_ILI", "Polygonizing layer %s with %d multilines", poAreaLineLayer->GetLayerDefn()->GetName(), gc->getNumGeometries());
+    CPLDebug( "OGR_ILI", "nAreaFieldIndex: %d nPointFieldIndex: %d", nAreaFieldIndex, nPointFieldIndex);
     poAreaLineLayer = 0;
     OGRMultiPolygon* polys = Polygonize( gc , false);
     CPLDebug( "OGR_ILI", "Resulting polygons: %d", polys->getNumGeometries());
@@ -514,6 +515,7 @@ void OGRILI1Layer::PolygonizeAreaLayer( OGRILI1Layer* poAreaLineLayer, int nArea
         CPLDebug( "OGR_ILI", "Polygonizing again with crossing line fix");
         delete polys;
         polys = Polygonize( gc, true ); //try again with crossing line fix
+        CPLDebug( "OGR_ILI", "Resulting polygons: %d", polys->getNumGeometries());
     }
     delete gc;
 
