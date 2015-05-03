@@ -305,6 +305,8 @@ int OGRILI2DataSource::TestCapability( const char * pszCap )
 {
     if( EQUAL(pszCap,ODsCCreateLayer) )
         return TRUE;
+    else if( EQUAL(pszCap,ODsCCurveGeometries) )
+        return TRUE;
     else
         return FALSE;
 }
