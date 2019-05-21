@@ -253,21 +253,21 @@ static OGRCompoundCurve *getPolyline(DOMElement *elem) {
         char* pszObjValue = getObjValue(arcElem);
         if( pszObjValue )
         {
-            if (cmpStr("C1", pszTagName2) == 0)
+          if (cmpStr("C1", pszTagName2) == 0)
             ptEnd->setX(CPLAtof(pszObjValue));
-            else if (cmpStr("C2", pszTagName2) == 0)
+          else if (cmpStr("C2", pszTagName2) == 0)
             ptEnd->setY(CPLAtof(pszObjValue));
-            else if (cmpStr("C3", pszTagName2) == 0)
+          else if (cmpStr("C3", pszTagName2) == 0)
             ptEnd->setZ(CPLAtof(pszObjValue));
-            else if (cmpStr("A1", pszTagName2) == 0)
+          else if (cmpStr("A1", pszTagName2) == 0)
             ptOnArc->setX(CPLAtof(pszObjValue));
-            else if (cmpStr("A2", pszTagName2) == 0)
+          else if (cmpStr("A2", pszTagName2) == 0)
             ptOnArc->setY(CPLAtof(pszObjValue));
-            else if (cmpStr("A3", pszTagName2) == 0)
+          else if (cmpStr("A3", pszTagName2) == 0)
             ptOnArc->setZ(CPLAtof(pszObjValue));
-            else if (cmpStr("R", pszTagName2) == 0) {
+          else if (cmpStr("R", pszTagName2) == 0) {
             // radius = CPLAtof(pszObjValue);
-            }
+          }
         }
         CPLFree(pszObjValue);
         XMLString::release(&pszTagName2);
@@ -281,6 +281,14 @@ static OGRCompoundCurve *getPolyline(DOMElement *elem) {
       arc->addPoint(ptOnArc);
       arc->addPoint(ptEnd);
       ogrCurve->addCurveDirectly(arc);
+
+      // Add arc endpoint as next start point, if COORD sequence follows.
+      DOMElement *nextElem = dynamic_cast<DOMElement *>(lineElem->getNextSibling());
+      char* nextTagName = XMLString::transcode(nextElem->getTagName());
+      if (cmpStr(ILI2_COORD, nextTagName) == 0) {
+        ls->addPoint(ptEnd);
+      }
+      XMLString::release(&nextTagName);
 
       delete ptStart;
       delete ptEnd;
